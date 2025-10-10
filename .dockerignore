@@ -1,0 +1,64 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+venv/
+env/
+ENV/
+venv.bak/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Test and coverage
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+tests/
+
+# Caches and tooling
+.mypy_cache/
+.cache/
+*.log
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Jupyter
+.ipynb_checkpoints
+
+# Databases
+*.sqlite3
+*.db
+
+# Node (if present)
+node_modules/
+
+# Docs / build artifacts
+docs/_build/
+
+# Secrets / env
+.env.local
+.local.env
