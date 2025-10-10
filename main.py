@@ -1,7 +1,3 @@
-# ============================================
-# main.py - FastAPI Entry Point
-# ============================================
-
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +9,6 @@ import io
 import os
 
 from database import init_db, get_db
-from models import User, Project, Task, Assignment
 from schemas import (
     UserCreate, ProjectCreate, TaskCreate, 
     AssignmentRequest, AgentResponse

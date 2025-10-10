@@ -1,7 +1,3 @@
-# ============================================
-# models.py - SQLAlchemy ORM Models
-# ============================================
-
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey, Enum, Boolean, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime

@@ -10,7 +10,7 @@ load_dotenv()
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/auto_project_manager"
+    "postgresql://postgres:postgres@localhost:5432/auto_project_manager"
 )
 
 # For SQLite (development)
