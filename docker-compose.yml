@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: auto_project_manager
     ports:
-      - "5432:5432"
+      - "5444:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,70 +20,70 @@ services:
     networks:
       - auto_pm_network
 
-  fastapi:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: auto_pm_api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/auto_project_manager
-      SERVER_BASE_URL: http://localhost:8000
-      ASSIGN_TASK_AGENT_URL: http://assign_agent:8001/api/agents/assign-task
-      EXCHANGE_TASK_AGENT_URL: http://exchange_agent:8002/api/agents/exchange-task
-      ZALO_BASE_URL: https://openapi.zalo.me
-      ZALO_ACCESS_TOKEN: ${ZALO_ACCESS_TOKEN:-your_token_here}
-      ZALO_OA_ID: ${ZALO_OA_ID:-your_oa_id_here}
-      ENVIRONMENT: development
-      LOG_LEVEL: INFO
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./qrcodes:/app/qrcodes
-      - ./logs:/app/logs
-      - .:/app
-    networks:
-      - auto_pm_network
+  # fastapi:
+  #   build: 
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: auto_pm_api
+  #   command: uvicorn main:app --host 0.0.0.0 --port 5544 --reload
+  #   ports:
+  #     - "5544:5544"
+  #   environment:
+  #     DATABASE_URL: postgresql://user:password@postgres:5432/auto_project_manager
+  #     SERVER_BASE_URL: http://localhost:5544
+  #     ASSIGN_TASK_AGENT_URL: http://assign_agent:8001/api/agents/assign-task
+  #     EXCHANGE_TASK_AGENT_URL: http://exchange_agent:8002/api/agents/exchange-task
+  #     ZALO_BASE_URL: https://openapi.zalo.me
+  #     ZALO_ACCESS_TOKEN: ${ZALO_ACCESS_TOKEN:-your_token_here}
+  #     ZALO_OA_ID: ${ZALO_OA_ID:-your_oa_id_here}
+  #     ENVIRONMENT: development
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./qrcodes:/app/qrcodes
+  #     - ./logs:/app/logs
+  #     - .:/app
+  #   networks:
+  #     - auto_pm_network
 
-  assign_agent:
-    build:
-      context: .
-      dockerfile: Dockerfile.agent
-    container_name: auto_pm_assign_agent
-    command: uvicorn agents.asign_task_agent:app --host 0.0.0.0 --port 8001 --reload
-    ports:
-      - "8001:8001"
-    environment:
-      LOG_LEVEL: INFO
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - auto_pm_network
+  # assign_agent:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.agent
+  #   container_name: auto_pm_assign_agent
+  #   command: uvicorn agents.asign_task_agent:app --host 0.0.0.0 --port 8001 --reload
+  #   ports:
+  #     - "8001:8001"
+  #   environment:
+  #     LOG_LEVEL: INFO
+  #   volumes:
+  #     - ./logs:/app/logs
+  #   networks:
+  #     - auto_pm_network
 
-  exchange_agent:
-    build:
-      context: .
-      dockerfile: Dockerfile.agent
-    container_name: auto_pm_exchange_agent
-    # Note: You'll need to create agents/exchange_task_agent.py based on the code in asign_task_agent.py
-    command: python -c "
-      import sys; sys.path.append('/app');
-      from agents.asign_task_agent import app as exchange_app;
-      import uvicorn;
-      exchange_app.title = 'Task Exchange Agent';
-      uvicorn.run(exchange_app, host='0.0.0.0', port=8002)
-      "
-    ports:
-      - "8002:8002"
-    environment:
-      LOG_LEVEL: INFO
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - auto_pm_network
+  # exchange_agent:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.agent
+  #   container_name: auto_pm_exchange_agent
+  #   # Note: You'll need to create agents/exchange_task_agent.py based on the code in asign_task_agent.py
+  #   command: python -c "
+  #     import sys; sys.path.append('/app');
+  #     from agents.asign_task_agent import app as exchange_app;
+  #     import uvicorn;
+  #     exchange_app.title = 'Task Exchange Agent';
+  #     uvicorn.run(exchange_app, host='0.0.0.0', port=8002)
+  #     "
+  #   ports:
+  #     - "8002:8002"
+  #   environment:
+  #     LOG_LEVEL: INFO
+  #   volumes:
+  #     - ./logs:/app/logs
+  #   networks:
+  #     - auto_pm_network
 
 volumes:
   postgres_data:

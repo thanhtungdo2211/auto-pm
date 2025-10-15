@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, Optional
 import os
 from pathlib import Path
+from services.analysis_cv import GenCVAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ class ZaloWebhookService:
         self.hr_user_id = os.getenv("HR_USER_ID", "")
         self.upload_dir = Path("uploads/cvs")
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.cv_analyzer = GenCVAnalyzer()
+        self._cv_cache = {}
     
     async def handle_webhook_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -180,7 +183,7 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
                 
                 with open(cv_path, "wb") as f:
                     f.write(response.content)
-                
+                print(".....")
                 logger.info(f"CV downloaded: {cv_path}")
                 return cv_path
         
@@ -190,18 +193,89 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
     
     async def extract_cv_information(self, cv_path: Path) -> Dict[str, Any]:
         """
-        Extract information from CV PDF
-        This is a placeholder - implement with your CV extraction tool
+        Extract information from CV PDF using GenCVAnalyzer (with caching)
         """
-        # TODO: Integrate with your CV extraction tool
-        # For now, return placeholder data
-        return {
-            "name": "To be extracted",
-            "email": "to_be_extracted@example.com",
-            "phone": "0000000000",
-            "skills": ["Python", "FastAPI"],
-            "description": "Extracted from CV"
-        }
+        try:
+            # Check cache first
+            cv_path_str = str(cv_path)
+            if cv_path_str in self._cv_cache:
+                logger.info(f"Using cached CV data for: {cv_path}")
+                return self._cv_cache[cv_path_str]
+            
+            logger.info(f"Extracting CV information from: {cv_path}")
+            
+            # Use CV analyzer to extract data
+            result = self.cv_analyzer.query(cv_path_str)
+            
+            if not result or not result.candidates:
+                logger.error("No candidate data extracted from CV")
+                return {
+                    "name": "Unknown",
+                    "email": None,
+                    "phone": None,
+                    "skills": [],
+                    "description": "CV extraction failed"
+                }
+            
+            # Get first candidate
+            candidate = result.candidates[0]
+            
+            # Map to user schema format
+            cv_data = {
+                "name": candidate.name or "Unknown",
+                "email": candidate.email,
+                "phone": None,
+                "skills": candidate.skills or [],
+                "description": self._build_description(candidate),
+                "experience_years": candidate.experience_years,
+                "experience_level": candidate.experience_level,
+                "role": candidate.role,
+                "projects": [
+                    {
+                        "name": p.name,
+                        "role": p.role,
+                        "contribution": p.contribution
+                    } for p in (candidate.projects or [])
+                ],
+                "strengths": candidate.strengths or []
+            }
+            
+            # Cache the result
+            self._cv_cache[cv_path_str] = cv_data
+            
+            logger.info(f"Successfully extracted CV data for: {cv_data['name']}")
+            return cv_data
+            
+        except Exception as e:
+            logger.error(f"Error extracting CV information: {str(e)}")
+            return {
+                "name": "Unknown",
+                "email": None,
+                "phone": None,
+                "skills": [],
+                "description": f"CV extraction error: {str(e)}"
+            }
+    
+    def _build_description(self, candidate) -> str:
+        """Build description from candidate data"""
+        parts = []
+        
+        if candidate.role:
+            parts.append(f"Role: {candidate.role}")
+        
+        if candidate.experience_years:
+            parts.append(f"Experience: {candidate.experience_years} years")
+        
+        if candidate.experience_level:
+            parts.append(f"Level: {candidate.experience_level}")
+        
+        if candidate.strengths:
+            parts.append(f"Strengths: {', '.join(candidate.strengths)}")
+        
+        if candidate.projects:
+            parts.append(f"Projects: {len(candidate.projects)} projects")
+        
+        return " | ".join(parts) if parts else "No description available"
     
     async def notify_hr(self, user_data: Dict[str, Any]) -> bool:
         """Send notification to HR about new registration"""
@@ -233,7 +307,7 @@ User ID: {user_data.get('id')}"""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {
-                    "Authorization": f"Bearer {self.zalo_access_token}",
+                    "access_token": self.zalo_access_token,
                     "Content-Type": "application/json"
                 }
                 

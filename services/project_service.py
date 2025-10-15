@@ -27,54 +27,48 @@ class ProjectService:
     # ============================================
     
     def create_user(self, user_data: UserCreate) -> User:
-        """
-        Create a new user with validation
-        
-        Args:
-            user_data: UserCreate schema with user information
-            
-        Returns:
-            User object
-            
-        Raises:
-            ValueError: If user already exists or validation fails
-        """
+        """Create a new user"""
         try:
-            # Check if user already exists
-            existing_user = self.db.query(User).filter(
-                User.email == user_data.email
-            ).first()
-            
+            # Check if user already exists by email
+            existing_user = self.db.query(User).filter(User.email == user_data.email).first()
             if existing_user:
                 raise ValueError(f"User with email {user_data.email} already exists")
             
-            # Validate email format (basic)
-            if "@" not in user_data.email:
-                raise ValueError("Invalid email format")
+            # Check if user already exists by zalo_user_id
+            if user_data.zalo_user_id:
+                existing_zalo = self.db.query(User).filter(User.zalo_user_id == user_data.zalo_user_id).first()
+                if existing_zalo:
+                    raise ValueError(f"User with Zalo ID {user_data.zalo_user_id} already exists")
             
-            # Create new user
+            # Convert string role to UserRole enum
+            role_value = user_data.role
+            if isinstance(role_value, str):
+                role_value = UserRole(role_value)
+            
             user = User(
                 name=user_data.name,
                 email=user_data.email,
                 phone=user_data.phone,
                 cv=user_data.cv,
+                cv_data=user_data.cv_data,
+                zalo_user_id=user_data.zalo_user_id,
                 description=user_data.description,
-                skills=user_data.skills or [],
-                role=user_data.role or UserRole.STAFF,
-                is_active=True
+                additional_info=user_data.additional_info,
+                skills=user_data.skills,
+                role=role_value,
+                is_active=user_data.is_active
             )
             
             self.db.add(user)
             self.db.commit()
             self.db.refresh(user)
-            
-            logger.info(f"User created successfully: {user.id} - {user.email}")
+            logger.info(f"✅ User created: {user.id}")
             
             return user
         
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Error creating user: {str(e)}")
+            logger.error(f"❌ Error creating user: {str(e)}")
             raise
     
     def get_user(self, user_id: str) -> User:
@@ -152,50 +146,26 @@ class ProjectService:
     # ============================================
     
     def create_project(self, project_data: ProjectCreate) -> Project:
-        """
-        Create a new project
+        """Create a new project"""
+        # Verify manager exists
+        manager = self.db.query(User).filter(User.id == project_data.manager_id).first()
+        if not manager:
+            raise ValueError("Manager user not found")
         
-        Args:
-            project_data: ProjectCreate schema
-            
-        Returns:
-            Project object
-            
-        Raises:
-            ValueError: If manager not found
-        """
-        try:
-            # Verify manager exists
-            manager = self.get_user(project_data.manager_id)
-            if not manager:
-                raise ValueError("Manager user not found")
-            
-            # Verify manager is actually a manager or admin
-            if manager.role not in [UserRole.MANAGER, UserRole.ADMIN]:
-                raise ValueError("User must be a manager or admin to create projects")
-            
-            project = Project(
-                name=project_data.name,
-                description=project_data.description,
-                manager_id=project_data.manager_id,
-                status="active"
-            )
-            
-            self.db.add(project)
-            self.db.commit()
-            self.db.refresh(project)
-            
-            # Add manager as a member
-            self.add_project_member(project.id, project_data.manager_id)
-            
-            logger.info(f"Project created successfully: {project.id} - {project.name}")
-            
-            return project
+        project = Project(
+            name=project_data.name,
+            description=project_data.description,
+            manager_id=project_data.manager_id,
+            status=project_data.status,
+            additional_info=project_data.additional_info
+        )
         
-        except Exception as e:
-            self.db.rollback()
-            logger.error(f"Error creating project: {str(e)}")
-            raise
+        self.db.add(project)
+        self.db.commit()
+        self.db.refresh(project)
+        logger.info(f"Project created: {project.id}")
+        
+        return project
     
     def get_project(self, project_id: str) -> Project:
         """Get project by ID"""
@@ -348,46 +318,30 @@ class ProjectService:
     # ============================================
     
     def create_task(self, task_data: TaskCreate) -> Task:
-        """
-        Create a new task for a project
+        """Create a new task"""
+        # Verify project exists
+        project = self.db.query(Project).filter(Project.id == task_data.project_id).first()
+        if not project:
+            raise ValueError("Project not found")
         
-        Args:
-            task_data: TaskCreate schema
-            
-        Returns:
-            Task object
-            
-        Raises:
-            ValueError: If project not found
-        """
-        try:
-            # Verify project exists
-            project = self.get_project(task_data.project_id)
-            if not project:
-                raise ValueError("Project not found")
-            
-            task = Task(
-                title=task_data.title,
-                description=task_data.description,
-                project_id=task_data.project_id,
-                priority=task_data.priority or TaskPriority.MEDIUM,
-                status=TaskStatus.PENDING,
-                deadline=task_data.deadline,
-                requirements=task_data.requirements or []
-            )
-            
-            self.db.add(task)
-            self.db.commit()
-            self.db.refresh(task)
-            
-            logger.info(f"Task created successfully: {task.id} - {task.title}")
-            
-            return task
+        task = Task(
+            title=task_data.title,
+            description=task_data.description,
+            project_id=task_data.project_id,
+            priority=task_data.priority,
+            status=task_data.status,
+            deadline=task_data.deadline,
+            complete_at=task_data.complete_at,
+            requirements=task_data.requirements,
+            additional_info=task_data.additional_info
+        )
         
-        except Exception as e:
-            self.db.rollback()
-            logger.error(f"Error creating task: {str(e)}")
-            raise
+        self.db.add(task)
+        self.db.commit()
+        self.db.refresh(task)
+        logger.info(f"Task created: {task.id}")
+        
+        return task
     
     def get_task(self, task_id: str) -> Task:
         """Get task by ID"""

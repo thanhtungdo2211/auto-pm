@@ -11,6 +11,7 @@ import json
 
 load_dotenv('./.env')
 os.environ["OPENAI_API_KEY"] = os.getenv("API_KEY")
+# print("Using OpenAI API Key:", "****" + os.environ["OPENAI_API_KEY"][-4:])
 
 class Project(BaseModel):
     name: str
@@ -155,12 +156,12 @@ class GenCVAnalyzer:
         return response
 
 # Example usage
-if __name__ == "__main__":
-    cv_path = "/mnt/d/tungdt/auto-pm/data/CV_Đỗ Thanh Tùng _AI Engineer_update29_2.pdf"
-    try:
-        bot = GenCVAnalyzer()
-        result = bot.query(cv_path)
-        print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+# if __name__ == "__main__":
+#     cv_path = "/home/mq-dev/tungdt/auto-pm/data/cv_test.pdf"
+#     try:
+#         bot = GenCVAnalyzer()
+#         result = bot.query(cv_path)
+#         print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
         # Sample output
     # {
     #   "candidates": [
@@ -212,5 +213,5 @@ if __name__ == "__main__":
     #     }
     #   ]
     # }
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    # except Exception as e:
+    #     print(f"❌ Error: {e}")

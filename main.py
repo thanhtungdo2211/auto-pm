@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
-import qrcode
+# import qrcode
 import io
 import os
 
@@ -16,6 +16,9 @@ from schemas import (
 from services.agent_service import AgentService
 from services.zalo_service import ZaloService
 from services.project_service import ProjectService
+from services.zalo_webhook_service import ZaloWebhookService
+
+from schemas import UserRole
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Initialize services
 agent_service = AgentService()
 zalo_service = ZaloService()
+zalo_webhook_service = ZaloWebhookService()
 project_service = ProjectService()
 
 @asynccontextmanager
@@ -55,6 +59,99 @@ app.add_middleware(
 # ============================================
 # API Endpoints
 # ============================================
+
+from typing import Set
+
+# Add cache for processed events
+processed_events: Set[str] = set()
+
+@app.post("/webhook-zalooa")
+async def zalo_webhook(request: dict):
+    try:
+        # Create idempotency key from request
+        event_id = f"{request.get('event_name', '')}_{request.get('timestamp', '')}_{request.get('sender', {}).get('id', '')}"
+        
+        # Check if already processed
+        if event_id in processed_events:
+            logger.info(f"Event already processed: {event_id}")
+            return {"status": "duplicate", "message": "Event already processed"}
+        
+        result = await zalo_webhook_service.handle_webhook_event(request)
+        
+        if result.get("action") == "cv_received":
+            cv_data = result.get("cv_data", {})
+            user_id_zalo = result.get("user_id")
+
+            # Create user with full CV data
+            user_create_data = UserCreate(
+                name=cv_data.get("name", "Unknown"),
+                email=cv_data.get("email"),
+                phone=cv_data.get("phone"),
+                cv=result.get("cv_path"),
+                cv_data=cv_data,
+                zalo_user_id=user_id_zalo,
+                description=cv_data.get("description", ""),
+                skills=cv_data.get("skills", []),
+                role="staff"
+            )
+            
+            try:
+                user = project_service.create_user(user_create_data)
+                
+                # Mark event as processed
+                processed_events.add(event_id)
+                
+                # Send notifications
+                await zalo_webhook_service.send_success_notification(
+                    user_id_zalo,
+                    {
+                        "id": user.id,
+                        "name": user.name,
+                        "email": user.email,
+                        "skills": user.skills,
+                        "experience_years": cv_data.get("experience_years"),
+                        "experience_level": cv_data.get("experience_level")
+                    }
+                )
+                
+                await zalo_webhook_service.notify_hr({
+                    "id": user.id,
+                    "name": user.name,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "skills": user.skills,
+                    "experience_years": cv_data.get("experience_years"),
+                    "experience_level": cv_data.get("experience_level"),
+                    "projects": cv_data.get("projects", [])
+                })
+                
+                logger.info(f"✅ User registered via Zalo: {user.id}")
+                return {"status": "success", "user_id": user.id, "result": result}
+                
+            except ValueError as e:
+                logger.error(f"❌ User creation error: {str(e)}")
+                await zalo_webhook_service.send_zalo_message({
+                    "recipient": {"user_id": user_id_zalo},
+                    "message": {"text": f"❌ Lỗi đăng ký: {str(e)}"}
+                })
+                return {"status": "error", "message": str(e)}
+        
+        return {"status": "success", "result": result}
+    
+    except Exception as e:
+        logger.error(f"❌ Error processing Zalo webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# @app.get("/webhook/zalo")
+# async def zalo_webhook_verification(hub_mode: str = None, hub_challenge: str = None, hub_verify_token: str = None):
+#     """
+#     Webhook verification endpoint for Zalo
+#     """
+#     # Verify the webhook (if Zalo requires this)
+#     if hub_mode == "subscribe" and hub_verify_token == os.getenv("ZALO_VERIFY_TOKEN", ""):
+#         return hub_challenge
+    
+#     return {"status": "ok"}
 
 @app.post("/api/users/create")
 async def create_user(user_data: UserCreate):
@@ -388,21 +485,21 @@ async def get_assignment(assignment_id: str):
         logger.error(f"Error retrieving assignment: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/api/qrcode/{assignment_id}")
-async def get_qr_code(assignment_id: str):
-    """
-    Get QR code for an assignment
-    """
-    try:
-        assignment = project_service.get_assignment(assignment_id)
-        if not assignment:
-            raise HTTPException(status_code=404, detail="Assignment not found")
+# @app.get("/api/qrcode/{assignment_id}")
+# async def get_qr_code(assignment_id: str):
+#     """
+#     Get QR code for an assignment
+#     """
+#     try:
+#         assignment = project_service.get_assignment(assignment_id)
+#         if not assignment:
+#             raise HTTPException(status_code=404, detail="Assignment not found")
         
-        qr_code_path = generate_qr_code(assignment.zalo_link)
-        return FileResponse(qr_code_path, media_type="image/png")
-    except Exception as e:
-        logger.error(f"Error generating QR code: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+#         qr_code_path = generate_qr_code(assignment.zalo_link)
+#         return FileResponse(qr_code_path, media_type="image/png")
+#     except Exception as e:
+#         logger.error(f"Error generating QR code: {str(e)}")
+#         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/health")
 async def health_check():
@@ -416,33 +513,33 @@ async def health_check():
 # Helper Functions
 # ============================================
 
-def generate_qr_code(data: str, filename: str = None) -> str:
-    """
-    Generate QR code from data
-    """
-    if filename is None:
-        filename = f"qrcode_{datetime.now().timestamp()}.png"
+# def generate_qr_code(data: str, filename: str = None) -> str:
+#     """
+#     Generate QR code from data
+#     """
+#     if filename is None:
+#         filename = f"qrcode_{datetime.now().timestamp()}.png"
     
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(data)
-    qr.make(fit=True)
+#     qr = qrcode.QRCode(
+#         version=1,
+#         error_correction=qrcode.constants.ERROR_CORRECT_L,
+#         box_size=10,
+#         border=4,
+#     )
+#     qr.add_data(data)
+#     qr.make(fit=True)
     
-    img = qr.make_image(fill_color="black", back_color="white")
+#     img = qr.make_image(fill_color="black", back_color="white")
     
-    # Create qrcodes directory if it doesn't exist
-    os.makedirs("qrcodes", exist_ok=True)
+#     # Create qrcodes directory if it doesn't exist
+#     os.makedirs("qrcodes", exist_ok=True)
     
-    filepath = f"qrcodes/{filename}"
-    img.save(filepath)
+#     filepath = f"qrcodes/{filename}"
+#     img.save(filepath)
     
-    return filepath
+#     return filepath
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=5544)

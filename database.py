@@ -10,7 +10,7 @@ load_dotenv()
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/auto_project_manager"
+    "postgresql://postgres:postgres@localhost:5444/auto_project_manager"
 )
 
 # For SQLite (development)
@@ -20,7 +20,7 @@ DATABASE_URL = os.getenv(
 #     connect_args={"check_same_thread": False},
 #     poolclass=StaticPool,
 # )
-
+print("Connecting to database at:", DATABASE_URL)
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
