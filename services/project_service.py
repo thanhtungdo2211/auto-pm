@@ -411,6 +411,15 @@ class ProjectService:
             logger.error(f"Error getting project tasks: {str(e)}")
             return []
     
+    def list_tasks(self, skip: int = 0, limit: int = 10):
+        """List tasks with pagination"""
+        try:
+            tasks = self.db.query(Task).offset(skip).limit(limit).all()
+            return tasks
+        except Exception as e:
+            logger.error(f"Error listing tasks: {str(e)}")
+            return []
+    
     def update_task(self, task_id: str, **kwargs) -> Task:
         """Update task information"""
         try:
@@ -625,6 +634,28 @@ class ProjectService:
             return assignments
         except Exception as e:
             logger.error(f"Error getting project assignments: {str(e)}")
+            return []
+    
+    def list_assignments(
+        self,
+        skip: int = 0,
+        limit: int = 10,
+        user_id: str = None,
+        project_id: str = None,
+        task_id: str = None
+    ):
+        """List assignments with optional filters"""
+        try:
+            query = self.db.query(Assignment)
+            if user_id:
+                query = query.filter(Assignment.user_id == user_id)
+            if project_id:
+                query = query.filter(Assignment.project_id == project_id)
+            if task_id:
+                query = query.filter(Assignment.task_id == task_id)
+            return query.offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(f"Error listing assignments: {str(e)}")
             return []
     
     def get_pending_assignments(self):

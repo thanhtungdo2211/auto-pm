@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: auto_pm_api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     environment:
@@ -36,7 +36,6 @@ services:
       ZALO_BASE_URL: https://openapi.zalo.me
       ZALO_ACCESS_TOKEN: ${ZALO_ACCESS_TOKEN:-your_token_here}
       ZALO_OA_ID: ${ZALO_OA_ID:-your_oa_id_here}
-      ZALO_SECRET_KEY: ${ZALO_SECRET_KEY:-your_secret_here}
       ENVIRONMENT: development
       LOG_LEVEL: INFO
     depends_on:
@@ -45,6 +44,7 @@ services:
     volumes:
       - ./qrcodes:/app/qrcodes
       - ./logs:/app/logs
+      - .:/app
     networks:
       - auto_pm_network
 
@@ -53,7 +53,7 @@ services:
       context: .
       dockerfile: Dockerfile.agent
     container_name: auto_pm_assign_agent
-    command: uvicorn agents.asign_task_agent:app --host 0.0.0.0 --port 8001
+    command: uvicorn agents.asign_task_agent:app --host 0.0.0.0 --port 8001 --reload
     ports:
       - "8001:8001"
     environment:

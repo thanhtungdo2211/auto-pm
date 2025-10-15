@@ -99,7 +99,6 @@ EXCHANGE_TASK_AGENT_URL=http://localhost:8002/api/agents/exchange-task
 ZALO_BASE_URL=https://openapi.zalo.me
 ZALO_ACCESS_TOKEN=your_token_here
 ZALO_OA_ID=your_oa_id_here
-ZALO_SECRET_KEY=your_secret_here
 
 # Environment
 ENVIRONMENT=development

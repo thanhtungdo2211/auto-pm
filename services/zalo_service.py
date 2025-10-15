@@ -20,31 +20,6 @@ class ZaloService:
         self.zalo_oa_id = os.getenv("ZALO_OA_ID", "")
         self.server_base_url = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
     
-    async def generate_zalo_oa_link(
-        self,
-        user_id: str,
-        assignment_id: str,
-        task_id: str
-    ) -> str:
-        """
-        Generate Zalo OA link for staff to join conversation
-        Format: https://zalo.me/oa/{oa_id}/?data={assignment_id}
-        """
-        try:
-            # Create a reference token/code that links assignment to Zalo conversation
-            reference_code = f"{assignment_id}:{task_id}:{user_id}"
-            
-            # Zalo OA link format
-            # You can customize this based on your Zalo OA setup
-            zalo_link = f"https://zalo.me/oa/{self.zalo_oa_id}/?params=assignment_id:{assignment_id}"
-            
-            logger.info(f"Generated Zalo OA link for assignment: {assignment_id}")
-            
-            return zalo_link
-        
-        except Exception as e:
-            logger.error(f"Error generating Zalo OA link: {str(e)}")
-            raise
     
     async def get_zalo_oa_info(self) -> Dict[str, Any]:
         """
@@ -120,31 +95,26 @@ class ZaloService:
             logger.error(f"Error sending Zalo message: {str(e)}")
             return False
     
-    async def create_zalo_conversion_link(
+    async def send_text_message(
         self,
-        assignment_id: str,
-        user_email: str,
-        task_title: str
-    ) -> str:
+        user_id: str,
+        text: str
+    ) -> bool:
         """
-        Create a direct conversation link with pre-filled information
-        This link will open Zalo with the task assignment context
+        Send simple text message to user
         """
         try:
-            # Create a deep link that includes assignment context
-            # Format can be customized based on your needs
-            conversation_link = (
-                f"{self.server_base_url}/zalo/callback?"
-                f"assignment_id={assignment_id}&"
-                f"email={user_email}&"
-                f"task={task_title}&"
-                f"oa_id={self.zalo_oa_id}"
-            )
+            payload = {
+                "recipient": {
+                    "user_id": user_id
+                },
+                "message": {
+                    "text": text
+                }
+            }
             
-            logger.info(f"Created conversation link for assignment: {assignment_id}")
-            
-            return conversation_link
+            return await self.send_zalo_message(user_id, "", text)
         
         except Exception as e:
-            logger.error(f"Error creating Zalo conversation link: {str(e)}")
-            raise
+            logger.error(f"Error sending text message: {str(e)}")
+            return False
