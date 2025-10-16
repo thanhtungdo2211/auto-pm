@@ -162,56 +162,56 @@ class GenCVAnalyzer:
 #         bot = GenCVAnalyzer()
 #         result = bot.query(cv_path)
 #         print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
-        # Sample output
-    # {
-    #   "candidates": [
-    #     {
-    #       "id": "string",
-    #       "name": "Đỗ Thanh Tùng",
-    #       "role": "AI Engineer",
-    #       "email": "tung.0982548086@gmail.com",
-    #       "experience_years": 2,
-    #       "experience_level": "Junior",
-    #       "skills": [
-    #         "Python",
-    #         "C/C++",
-    #         "PyTorch",
-    #         "TensorFlow",
-    #         "OpenCV",
-    #         "Numpy",
-    #         "YOLOv7",
-    #         "YOLOv5n",
-    #         "YOLOv8n",
-    #         "Docker",
-    #         "StreamLit",
-    #         "PaddleOCR",
-    #         "VietOCR",
-    #         "DB"
-    #       ],
-    #       "strengths": [
-    #         "Strong logical thinking",
-    #         "Proactive learner"
-    #       ],
-    #       "projects": [
-    #         {
-    #           "name": "Drowning Detection",
-    #           "role": "Member",
-    #           "contribution": "Developed a system for detecting drowning using YOLOv7 and Grid Tracker, achieving high accuracy."
-    #         },
-    #         {
-    #           "name": "Invoice Extraction",
-    #           "role": "Member",
-    #           "contribution": "Built an invoice information extraction system using DB for text detection and Transformer OCR for text recognition."
-    #         },
-    #         {
-    #           "name": "Violence Detection",
-    #           "role": "Member",
-    #           "contribution": "Developed a violence detection system using Yolov5n, Yolov7tiny, Yolov8n, and implemented identity verification using CNN."
-    #         }
-    #       ],
-    #       "note": null
-    #     }
-    #   ]
-    # }
-    # except Exception as e:
-    #     print(f"❌ Error: {e}")
+#     #     Sample output
+#     # {
+#     #   "candidates": [
+#     #     {
+#     #       "id": "string",
+#     #       "name": "Đỗ Thanh Tùng",
+#     #       "role": "AI Engineer",
+#     #       "email": "tung.0982548086@gmail.com",
+#     #       "experience_years": 2,
+#     #       "experience_level": "Junior",
+#     #       "skills": [
+#     #         "Python",
+#     #         "C/C++",
+#     #         "PyTorch",
+#     #         "TensorFlow",
+#     #         "OpenCV",
+#     #         "Numpy",
+#     #         "YOLOv7",
+#     #         "YOLOv5n",
+#     #         "YOLOv8n",
+#     #         "Docker",
+#     #         "StreamLit",
+#     #         "PaddleOCR",
+#     #         "VietOCR",
+#     #         "DB"
+#     #       ],
+#     #       "strengths": [
+#     #         "Strong logical thinking",
+#     #         "Proactive learner"
+#     #       ],
+#     #       "projects": [
+#     #         {
+#     #           "name": "Drowning Detection",
+#     #           "role": "Member",
+#     #           "contribution": "Developed a system for detecting drowning using YOLOv7 and Grid Tracker, achieving high accuracy."
+#     #         },
+#     #         {
+#     #           "name": "Invoice Extraction",
+#     #           "role": "Member",
+#     #           "contribution": "Built an invoice information extraction system using DB for text detection and Transformer OCR for text recognition."
+#     #         },
+#     #         {
+#     #           "name": "Violence Detection",
+#     #           "role": "Member",
+#     #           "contribution": "Developed a violence detection system using Yolov5n, Yolov7tiny, Yolov8n, and implemented identity verification using CNN."
+#     #         }
+#     #       ],
+#     #       "note": null
+#     #     }
+#     #   ]
+#     # }
+#     except Exception as e:
+#         print(f"❌ Error: {e}")

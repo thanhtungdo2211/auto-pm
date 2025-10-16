@@ -1,12 +1,12 @@
+import logging
+from datetime import datetime
+
 from database import SessionLocal
 from models import (
     User, Project, Task, 
     Assignment, ProjectMember
 )
 from schemas import UserCreate, ProjectCreate, TaskCreate
-import logging
-from datetime import datetime
-import uuid
 
 logger = logging.getLogger(__name__)
 

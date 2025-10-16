@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Dict
 
 from database import init_db, get_db
 from schemas import (
@@ -14,6 +15,7 @@ from services.agent_service import AgentService
 from services.zalo_service import ZaloService
 from services.project_service import ProjectService
 from services.zalo_webhook_service import ZaloWebhookService
+from services.analysis_cv import GenCVAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +24,8 @@ logger = logging.getLogger(__name__)
 # Initialize services
 agent_service = AgentService()
 zalo_service = ZaloService()
-zalo_webhook_service = ZaloWebhookService()
+cv_analyzer = GenCVAnalyzer()
+zalo_webhook_service = ZaloWebhookService(cv_analyzer=cv_analyzer)
 project_service = ProjectService()
 
 @asynccontextmanager
@@ -58,11 +61,24 @@ app.add_middleware(
 from typing import Set
 
 # Add cache for processed events
-processed_events: Set[str] = set()
+processed_events: Dict[str, datetime] = {}
+
+def cleanup_old_events():
+    """Remove events older than 1 hour"""
+    cutoff = datetime.now() - timedelta(hours=1)
+    to_remove = [
+        event_id for event_id, timestamp in processed_events.items()
+        if timestamp < cutoff
+    ]
+    for event_id in to_remove:
+        del processed_events[event_id]
 
 @app.post("/webhook-zalooa")
 async def zalo_webhook(request: dict):
     try:
+        # Cleanup old events
+        cleanup_old_events()
+        
         # Create idempotency key from request
         event_id = f"{request.get('event_name', '')}_{request.get('timestamp', '')}_{request.get('sender', {}).get('id', '')}"
         
@@ -73,16 +89,61 @@ async def zalo_webhook(request: dict):
         
         result = await zalo_webhook_service.handle_webhook_event(request)
         
+        # Handle CV submission
         if result.get("action") == "cv_received":
             cv_data = result.get("cv_data", {})
             user_id_zalo = result.get("user_id")
-
+            cv_path = result.get("cv_path")
+            
+            # Store pending registration
+            registration_id = zalo_webhook_service.store_pending_registration(
+                cv_data=cv_data,
+                cv_path=cv_path,
+                user_id_zalo=user_id_zalo
+            )
+            
+            # Notify candidate that CV is pending
+            await zalo_webhook_service.send_pending_notification(
+                user_id_zalo,
+                cv_data.get("name", "Unknown")
+            )
+            
+            # Send to HR for approval
+            await zalo_webhook_service.notify_hr(registration_id, cv_data)
+            
+            # Mark event as processed
+            processed_events[event_id] = datetime.now()
+            
+            logger.info(f"✅ CV submitted and pending HR approval: {registration_id}")
+            return {
+                "status": "success",
+                "action": "pending_approval",
+                "registration_id": registration_id
+            }
+        
+        # Handle HR approval
+        elif result.get("action") == "hr_approved":
+            registration_id = result.get("registration_id")
+            
+            # Get pending registration
+            pending = zalo_webhook_service.get_pending_registration(registration_id)
+            
+            if not pending:
+                await zalo_webhook_service.send_zalo_message({
+                    "recipient": {"user_id": zalo_webhook_service.hr_user_id},
+                    "message": {"text": f"❌ Registration ID không tồn tại: {registration_id}"}
+                })
+                return {"status": "error", "message": "Registration not found"}
+            
+            cv_data = pending["cv_data"]
+            user_id_zalo = pending["user_id_zalo"]
+            
             # Create user with full CV data
             user_create_data = UserCreate(
                 name=cv_data.get("name", "Unknown"),
                 email=cv_data.get("email"),
                 phone=cv_data.get("phone"),
-                cv=result.get("cv_path"),
+                cv=pending["cv_path"],
                 cv_data=cv_data,
                 zalo_user_id=user_id_zalo,
                 description=cv_data.get("description", ""),
@@ -93,11 +154,14 @@ async def zalo_webhook(request: dict):
             try:
                 user = project_service.create_user(user_create_data)
                 
-                # Mark event as processed
-                processed_events.add(event_id)
+                # Remove pending registration
+                zalo_webhook_service.remove_pending_registration(registration_id)
                 
-                # Send notifications
-                await zalo_webhook_service.send_success_notification(
+                # Mark event as processed
+                processed_events[event_id] = datetime.now()
+                
+                # Send approval notification to candidate
+                await zalo_webhook_service.send_approval_notification(
                     user_id_zalo,
                     {
                         "id": user.id,
@@ -109,27 +173,60 @@ async def zalo_webhook(request: dict):
                     }
                 )
                 
-                await zalo_webhook_service.notify_hr({
-                    "id": user.id,
-                    "name": user.name,
-                    "email": user.email,
-                    "phone": user.phone,
-                    "skills": user.skills,
-                    "experience_years": cv_data.get("experience_years"),
-                    "experience_level": cv_data.get("experience_level"),
-                    "projects": cv_data.get("projects", [])
+                # Confirm to HR
+                await zalo_webhook_service.send_zalo_message({
+                    "recipient": {"user_id": zalo_webhook_service.hr_user_id},
+                    "message": {"text": f"✅ Đã tạo tài khoản cho {user.name}\nUser ID: {user.id}"}
                 })
                 
-                logger.info(f"✅ User registered via Zalo: {user.id}")
-                return {"status": "success", "user_id": user.id, "result": result}
+                logger.info(f"✅ User approved and created: {user.id}")
+                return {"status": "success", "user_id": user.id}
                 
             except ValueError as e:
                 logger.error(f"❌ User creation error: {str(e)}")
                 await zalo_webhook_service.send_zalo_message({
-                    "recipient": {"user_id": user_id_zalo},
-                    "message": {"text": f"❌ Lỗi đăng ký: {str(e)}"}
+                    "recipient": {"user_id": zalo_webhook_service.hr_user_id},
+                    "message": {"text": f"❌ Lỗi tạo tài khoản: {str(e)}"}
                 })
                 return {"status": "error", "message": str(e)}
+        
+        # Handle HR decline
+        elif result.get("action") == "hr_declined":
+            registration_id = result.get("registration_id")
+            
+            # Get pending registration
+            pending = zalo_webhook_service.get_pending_registration(registration_id)
+            
+            if not pending:
+                await zalo_webhook_service.send_zalo_message({
+                    "recipient": {"user_id": zalo_webhook_service.hr_user_id},
+                    "message": {"text": f"❌ Registration ID không tồn tại: {registration_id}"}
+                })
+                return {"status": "error", "message": "Registration not found"}
+            
+            cv_data = pending["cv_data"]
+            user_id_zalo = pending["user_id_zalo"]
+            
+            # Remove pending registration
+            zalo_webhook_service.remove_pending_registration(registration_id)
+            
+            # Mark event as processed
+            processed_events[event_id] = datetime.now()
+            
+            # Send rejection notification to candidate
+            await zalo_webhook_service.send_rejection_notification(
+                user_id_zalo,
+                cv_data.get("name", "Unknown")
+            )
+            
+            # Confirm to HR
+            await zalo_webhook_service.send_zalo_message({
+                "recipient": {"user_id": zalo_webhook_service.hr_user_id},
+                "message": {"text": f"✅ Đã từ chối đơn của {cv_data.get('name')}"}
+            })
+            
+            logger.info(f"✅ Registration declined: {registration_id}")
+            return {"status": "success", "action": "declined"}
         
         return {"status": "success", "result": result}
     
@@ -137,17 +234,6 @@ async def zalo_webhook(request: dict):
         logger.error(f"❌ Error processing Zalo webhook: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-# @app.get("/webhook/zalo")
-# async def zalo_webhook_verification(hub_mode: str = None, hub_challenge: str = None, hub_verify_token: str = None):
-#     """
-#     Webhook verification endpoint for Zalo
-#     """
-#     # Verify the webhook (if Zalo requires this)
-#     if hub_mode == "subscribe" and hub_verify_token == os.getenv("ZALO_VERIFY_TOKEN", ""):
-#         return hub_challenge
-    
-#     return {"status": "ok"}
-
 @app.post("/api/users/create")
 async def create_user(user_data: UserCreate):
     """
