@@ -1,8 +1,7 @@
 from database import SessionLocal
 from models import (
-    User, Project, Task, Assignment, 
-    UserRole, TaskStatus, TaskPriority, 
-    AssignmentStatus, ProjectMember
+    User, Project, Task, 
+    Assignment, ProjectMember
 )
 from schemas import UserCreate, ProjectCreate, TaskCreate
 import logging
@@ -40,11 +39,6 @@ class ProjectService:
                 if existing_zalo:
                     raise ValueError(f"User with Zalo ID {user_data.zalo_user_id} already exists")
             
-            # Convert string role to UserRole enum
-            role_value = user_data.role
-            if isinstance(role_value, str):
-                role_value = UserRole(role_value)
-            
             user = User(
                 name=user_data.name,
                 email=user_data.email,
@@ -55,7 +49,7 @@ class ProjectService:
                 description=user_data.description,
                 additional_info=user_data.additional_info,
                 skills=user_data.skills,
-                role=role_value,
+                role=user_data.role,
                 is_active=user_data.is_active
             )
             
@@ -397,7 +391,7 @@ class ProjectService:
             logger.error(f"Error updating task: {str(e)}")
             raise
     
-    def update_task_status(self, task_id: str, status: TaskStatus) -> Task:
+    def update_task_status(self, task_id: str, status: str) -> Task:
         """Update task status"""
         return self.update_task(task_id, status=status)
     
@@ -454,7 +448,7 @@ class ProjectService:
                 user_id=user_id,
                 task_id=task_id,
                 project_id=project_id,
-                status=AssignmentStatus.PENDING
+                status="pending"
             )
             
             self.db.add(assignment)
@@ -508,7 +502,7 @@ class ProjectService:
     def update_assignment_status(
         self,
         assignment_id: str,
-        status: AssignmentStatus
+        status: str
     ) -> Assignment:
         """Update assignment status"""
         try:

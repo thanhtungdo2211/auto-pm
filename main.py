@@ -4,9 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
-# import qrcode
-import io
-import os
 
 from database import init_db, get_db
 from schemas import (
@@ -17,8 +14,6 @@ from services.agent_service import AgentService
 from services.zalo_service import ZaloService
 from services.project_service import ProjectService
 from services.zalo_webhook_service import ZaloWebhookService
-
-from schemas import UserRole
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -485,60 +480,12 @@ async def get_assignment(assignment_id: str):
         logger.error(f"Error retrieving assignment: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @app.get("/api/qrcode/{assignment_id}")
-# async def get_qr_code(assignment_id: str):
-#     """
-#     Get QR code for an assignment
-#     """
-#     try:
-#         assignment = project_service.get_assignment(assignment_id)
-#         if not assignment:
-#             raise HTTPException(status_code=404, detail="Assignment not found")
-        
-#         qr_code_path = generate_qr_code(assignment.zalo_link)
-#         return FileResponse(qr_code_path, media_type="image/png")
-#     except Exception as e:
-#         logger.error(f"Error generating QR code: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
 @app.get("/health")
 async def health_check():
     """
     Health check endpoint
     """
     return {"status": "healthy", "timestamp": datetime.now()}
-
-
-# ============================================
-# Helper Functions
-# ============================================
-
-# def generate_qr_code(data: str, filename: str = None) -> str:
-#     """
-#     Generate QR code from data
-#     """
-#     if filename is None:
-#         filename = f"qrcode_{datetime.now().timestamp()}.png"
-    
-#     qr = qrcode.QRCode(
-#         version=1,
-#         error_correction=qrcode.constants.ERROR_CORRECT_L,
-#         box_size=10,
-#         border=4,
-#     )
-#     qr.add_data(data)
-#     qr.make(fit=True)
-    
-#     img = qr.make_image(fill_color="black", back_color="white")
-    
-#     # Create qrcodes directory if it doesn't exist
-#     os.makedirs("qrcodes", exist_ok=True)
-    
-#     filepath = f"qrcodes/{filename}"
-#     img.save(filepath)
-    
-#     return filepath
-
 
 # if __name__ == "__main__":
 #     import uvicorn
