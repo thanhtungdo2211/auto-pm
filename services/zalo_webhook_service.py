@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, Optional
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 import logging
@@ -133,9 +133,12 @@ class ZaloWebhookService:
 
 Để đăng ký làm nhân viên, vui lòng gửi CV của bạn dưới dạng file PDF.
 
-📄 Yêu cầu:
-- File định dạng PDF
-- Bao gồm thông tin: Họ tên, Email, Số điện thoại, Kỹ năng
+📄 Yêu cầu CV bao gồm:
+- ✅ File định dạng PDF
+- ✅ Họ tên đầy đủ
+- ✅ Email liên hệ
+- ✅ Số điện thoại
+- ✅ Kỹ năng và kinh nghiệm
 
 Hệ thống sẽ tự động xử lý và thông báo kết quả cho bạn."""
                 }
@@ -144,7 +147,7 @@ Hệ thống sẽ tự động xử lý và thông báo kết quả cho bạn.""
             return await self.send_zalo_message(message)
         
         except Exception as e:
-            logger.error(f"Error sending registration instructions: {str(e)}")
+            logger.error(f"❌ Error sending registration instructions: {str(e)}")
             return False
     
     async def send_welcome_message(self, user_id: str) -> bool:
@@ -225,7 +228,7 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
             cv_data = {
                 "name": candidate.name or "Unknown",
                 "email": candidate.email,
-                "phone": None,
+                "phone": candidate.phone,
                 "skills": candidate.skills or [],
                 "description": self._build_description(candidate),
                 "experience_years": candidate.experience_years,
@@ -288,6 +291,9 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
             # Format skills list
             skills_text = ', '.join(user_data.get('skills', [])) if user_data.get('skills') else 'N/A'
             
+            # Format phone number
+            phone = user_data.get('phone', 'N/A')
+            
             # Format projects
             projects_text = ""
             projects = user_data.get('projects', [])
@@ -295,7 +301,11 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
                 for i, project in enumerate(projects[:3], 1):  # Show max 3 projects
                     projects_text += f"\n  {i}. {project.get('name', 'N/A')} - {project.get('role', 'N/A')}"
             else:
-                projects_text = "\n  No projects listed"
+                projects_text = "\n  Không có dự án"
+            
+            # Format strengths
+            strengths = user_data.get('strengths', [])
+            strengths_text = ', '.join(strengths) if strengths else 'N/A'
             
             message = {
                 "recipient": {
@@ -304,27 +314,28 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
                 "message": {
                     "text": f"""🆕 ĐƠN ĐĂNG KÝ MỚI CẦN DUYỆT
 
-👤 Họ tên: {user_data.get('name')}
-📧 Email: {user_data.get('email')}
-📱 SĐT: {user_data.get('phone', 'N/A')}
+👤 Họ tên: {user_data.get('name', 'N/A')}
+📧 Email: {user_data.get('email', 'N/A')}
+📱 Số điện thoại: {phone}
 💼 Vị trí: {user_data.get('role', 'N/A')}
 ⭐ Cấp độ: {user_data.get('experience_level', 'N/A')}
 📅 Kinh nghiệm: {user_data.get('experience_years', 'N/A')} năm
+💡 Điểm mạnh: {strengths_text}
 💪 Kỹ năng: {skills_text}
 📂 Dự án:{projects_text}
 
-Registration ID: {registration_id}
+🆔 Registration ID: {registration_id}
 
 Vui lòng xem xét và phản hồi:
-- Gõ: APPROVE {registration_id} để chấp nhận
-- Gõ: DECLINE {registration_id} để từ chối"""
+✅ Gõ: APPROVE {registration_id} để chấp nhận
+❌ Gõ: DECLINE {registration_id} để từ chối"""
                 }
             }
             
             return await self.send_zalo_message(message)
         
         except Exception as e:
-            logger.error(f"Error notifying HR: {str(e)}")
+            logger.error(f"❌ Error notifying HR: {str(e)}")
             return False
     
     def store_pending_registration(self, cv_data: Dict[str, Any], cv_path: str, user_id_zalo: str) -> str:
@@ -396,6 +407,8 @@ Vui lòng xem xét và phản hồi:
     async def send_approval_notification(self, user_id_zalo: str, user_data: Dict[str, Any]) -> bool:
         """Send approval notification to candidate"""
         try:
+            phone_text = f"\n📱 SĐT: {user_data.get('phone')}" if user_data.get('phone') else ""
+            
             message = {
                 "recipient": {
                     "user_id": user_id_zalo
@@ -408,7 +421,7 @@ Chúc mừng {user_data.get('name')}!
 
 📋 Thông tin tài khoản:
 👤 Tên: {user_data.get('name')}
-📧 Email: {user_data.get('email')}
+📧 Email: {user_data.get('email')}{phone_text}
 🆔 ID: {user_data.get('id')}
 
 HR sẽ liên hệ với bạn trong thời gian sớm nhất.
@@ -419,7 +432,7 @@ Cảm ơn bạn đã đăng ký!"""
             return await self.send_zalo_message(message)
         
         except Exception as e:
-            logger.error(f"Error sending approval notification: {str(e)}")
+            logger.error(f"❌ Error sending approval notification: {str(e)}")
             return False
     
     async def send_rejection_notification(self, user_id_zalo: str, name: str) -> bool:
@@ -430,7 +443,7 @@ Cảm ơn bạn đã đăng ký!"""
                     "user_id": user_id_zalo
                 },
                 "message": {
-                    "text": f"""❌ THÔNG BÁO TỪ HR
+                    "text": f"""THÔNG BÁO TỪ HR
 
 Xin chào {name},
 

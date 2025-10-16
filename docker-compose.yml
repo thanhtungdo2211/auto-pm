@@ -29,7 +29,7 @@ services:
   #   ports:
   #     - "5544:5544"
   #   environment:
-  #     DATABASE_URL: postgresql://user:password@postgres:5432/auto_project_manager
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auto_project_manager
   #     SERVER_BASE_URL: http://localhost:5544
   #     ASSIGN_TASK_AGENT_URL: http://assign_agent:8001/api/agents/assign-task
   #     EXCHANGE_TASK_AGENT_URL: http://exchange_agent:8002/api/agents/exchange-task

@@ -1,12 +1,16 @@
 import logging
 from datetime import datetime
+from typing import Optional, List
 
 from database import SessionLocal
 from models import (
     User, Project, Task, 
-    Assignment, ProjectMember
+    Assignment, ProjectMember, Comment, TaskWeight
 )
-from schemas import UserCreate, ProjectCreate, TaskCreate
+from schemas import (
+    UserCreate, ProjectCreate, TaskCreate, 
+    CommentCreate, TaskWeightCreate
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +66,10 @@ class ProjectService:
         
         except Exception as e:
             self.db.rollback()
-            logger.error(f"❌ Error creating user: {str(e)}")
+            logger.error(f"Error creating user: {str(e)}")
             raise
     
-    def get_user(self, user_id: str) -> User:
+    def get_user(self, user_id: str) -> Optional[User]:
         """Get user by ID"""
         try:
             user = self.db.query(User).filter(User.id == user_id).first()
@@ -76,7 +80,7 @@ class ProjectService:
             logger.error(f"Error getting user: {str(e)}")
             return None
     
-    def get_user_by_email(self, email: str) -> User:
+    def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email"""
         try:
             user = self.db.query(User).filter(User.email == email).first()
@@ -84,7 +88,16 @@ class ProjectService:
         except Exception as e:
             logger.error(f"Error getting user by email: {str(e)}")
             return None
-    
+
+    def get_user_by_zalo_id(self, zalo_user_id: str) -> Optional[User]:
+        """Get user by Zalo user ID"""
+        try:
+            user = self.db.query(User).filter(User.zalo_user_id == zalo_user_id).first()
+            return user
+        except Exception as e:
+            logger.error(f"Error getting user by Zalo ID: {str(e)}")
+            return None
+        
     def list_users(self, skip: int = 0, limit: int = 10):
         """List all users with pagination"""
         try:
@@ -139,7 +152,7 @@ class ProjectService:
     # Project Operations
     # ============================================
     
-    def create_project(self, project_data: ProjectCreate) -> Project:
+    def create_project(self, project_data: ProjectCreate) -> Optional[Project]:
         """Create a new project"""
         # Verify manager exists
         manager = self.db.query(User).filter(User.id == project_data.manager_id).first()
@@ -161,7 +174,7 @@ class ProjectService:
         
         return project
     
-    def get_project(self, project_id: str) -> Project:
+    def get_project(self, project_id: str) -> Optional[Project]:
         """Get project by ID"""
         try:
             project = self.db.query(Project).filter(
@@ -173,7 +186,42 @@ class ProjectService:
         except Exception as e:
             logger.error(f"Error getting project: {str(e)}")
             return None
-    
+        
+    def get_project_with_details(self, project_id: str) -> Optional[dict]:
+        """Get project with manager and members details"""
+        try:
+            project = self.get_project(project_id)
+            if not project:
+                return None
+            
+            # Get manager details
+            manager = self.get_user(project.manager_id)
+            
+            # Get members
+            members = self.get_project_members(project_id)
+            
+            # Get tasks count
+            tasks = self.get_project_tasks(project_id)
+            
+            return {
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "status": project.status,
+                "manager": {
+                    "id": manager.id,
+                    "name": manager.name,
+                    "email": manager.email
+                } if manager else None,
+                "members_count": len(members),
+                "tasks_count": len(tasks),
+                "created_at": project.created_at,
+                "updated_at": project.updated_at
+            }
+        except Exception as e:
+            logger.error(f"Error getting project details: {str(e)}")
+            return None
+
     def list_projects(self, skip: int = 0, limit: int = 10):
         """List all active projects"""
         try:
@@ -337,7 +385,7 @@ class ProjectService:
         
         return task
     
-    def get_task(self, task_id: str) -> Task:
+    def get_task(self, task_id: str) -> Optional[Task]:
         """Get task by ID"""
         try:
             task = self.db.query(Task).filter(Task.id == task_id).first()
@@ -346,6 +394,36 @@ class ProjectService:
             return task
         except Exception as e:
             logger.error(f"Error getting task: {str(e)}")
+            return None
+    
+    def get_task_with_details(self, task_id: str) -> Optional[dict]:
+        """Get task with project and assignment details"""
+        try:
+            task = self.get_task(task_id)
+            if not task:
+                return None
+            
+            project = self.get_project(task.project_id)
+            assignments = self.get_task_assignments(task_id)
+            
+            return {
+                "id": task.id,
+                "title": task.title,
+                "description": task.description,
+                "priority": task.priority,
+                "status": task.status,
+                "deadline": task.deadline,
+                "requirements": task.requirements,
+                "project": {
+                    "id": project.id,
+                    "name": project.name
+                } if project else None,
+                "assignments_count": len(assignments),
+                "created_at": task.created_at,
+                "updated_at": task.updated_at
+            }
+        except Exception as e:
+            logger.error(f"Error getting task details: {str(e)}")
             return None
     
     def get_project_tasks(self, project_id: str):
@@ -610,7 +688,7 @@ class ProjectService:
         """Get all pending assignments"""
         try:
             assignments = self.db.query(Assignment).filter(
-                Assignment.status == AssignmentStatus.PENDING
+                Assignment.status == "pending"
             ).all()
             return assignments
         except Exception as e:
@@ -632,9 +710,9 @@ class ProjectService:
             assignments = self.get_project_assignments(project_id)
             members = self.get_project_members(project_id)
             
-            completed_tasks = len([t for t in tasks if t.status == TaskStatus.COMPLETED])
-            pending_tasks = len([t for t in tasks if t.status == TaskStatus.PENDING])
-            in_progress_tasks = len([t for t in tasks if t.status == TaskStatus.IN_PROGRESS])
+            completed_tasks = len([t for t in tasks if t.status == "completed"])
+            pending_tasks = len([t for t in tasks if t.status == "pending"])
+            in_progress_tasks = len([t for t in tasks if t.status == "in_progress"])
             
             return {
                 "project_id": project_id,
@@ -644,7 +722,7 @@ class ProjectService:
                 "pending_tasks": pending_tasks,
                 "in_progress_tasks": in_progress_tasks,
                 "total_assignments": len(assignments),
-                "pending_assignments": len([a for a in assignments if a.status == AssignmentStatus.PENDING]),
+                "pending_assignments": len([a for a in assignments if a.status == "pending"]),
                 "total_members": len(members),
                 "completion_percentage": round((completed_tasks / len(tasks) * 100) if tasks else 0, 2)
             }
@@ -661,9 +739,9 @@ class ProjectService:
                 raise ValueError("User not found")
             
             assignments = self.get_user_assignments(user_id)
-            completed = len([a for a in assignments if a.status == AssignmentStatus.COMPLETED])
-            in_progress = len([a for a in assignments if a.status == AssignmentStatus.IN_PROGRESS])
-            pending = len([a for a in assignments if a.status == AssignmentStatus.PENDING])
+            completed = len([a for a in assignments if a.status == "completed"])
+            in_progress = len([a for a in assignments if a.status == "in_progress"])
+            pending = len([a for a in assignments if a.status == "pending"])
             
             return {
                 "user_id": user_id,
@@ -679,3 +757,231 @@ class ProjectService:
         except Exception as e:
             logger.error(f"Error getting user stats: {str(e)}")
             return {}
+        
+    def create_comment(self, comment_data: CommentCreate) -> Comment:
+        """Create a new comment on a task"""
+        try:
+            # Verify user, task, and project exist
+            user = self.get_user(comment_data.user_id)
+            task = self.get_task(comment_data.task_id)
+            project = self.get_project(comment_data.project_id)
+            
+            if not user:
+                raise ValueError(f"User not found: {comment_data.user_id}")
+            if not task:
+                raise ValueError(f"Task not found: {comment_data.task_id}")
+            if not project:
+                raise ValueError(f"Project not found: {comment_data.project_id}")
+            
+            # Verify task belongs to project
+            if task.project_id != comment_data.project_id:
+                raise ValueError(f"Task {comment_data.task_id} does not belong to project {comment_data.project_id}")
+            
+            comment = Comment(
+                user_id=comment_data.user_id,
+                task_id=comment_data.task_id,
+                project_id=comment_data.project_id,
+                content=comment_data.content
+            )
+            
+            self.db.add(comment)
+            self.db.commit()
+            self.db.refresh(comment)
+            
+            logger.info(f"✅ Comment created: {comment.id} by user {user.name} on task {task.title}")
+            return comment
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error creating comment: {str(e)}")
+            raise
+    
+    def get_comment(self, comment_id: str) -> Optional[Comment]:
+        """Get comment by ID"""
+        try:
+            comment = self.db.query(Comment).filter(Comment.id == comment_id).first()
+            if not comment:
+                logger.warning(f"Comment not found: {comment_id}")
+            return comment
+        except Exception as e:
+            logger.error(f"Error getting comment: {str(e)}")
+            return None
+    
+    def get_task_comments(self, task_id: str) -> List[Comment]:
+        """Get all comments for a task"""
+        try:
+            comments = self.db.query(Comment).filter(
+                Comment.task_id == task_id
+            ).order_by(Comment.created_at.desc()).all()
+            return comments
+        except Exception as e:
+            logger.error(f"Error getting task comments: {str(e)}")
+            return []
+    
+    def get_project_comments(self, project_id: str) -> List[Comment]:
+        """Get all comments for a project"""
+        try:
+            comments = self.db.query(Comment).filter(
+                Comment.project_id == project_id
+            ).order_by(Comment.created_at.desc()).all()
+            return comments
+        except Exception as e:
+            logger.error(f"Error getting project comments: {str(e)}")
+            return []
+    
+    def get_user_comments(self, user_id: str) -> List[Comment]:
+        """Get all comments by a user"""
+        try:
+            comments = self.db.query(Comment).filter(
+                Comment.user_id == user_id
+            ).order_by(Comment.created_at.desc()).all()
+            return comments
+        except Exception as e:
+            logger.error(f"Error getting user comments: {str(e)}")
+            return []
+    
+    def update_comment(self, comment_id: str, content: str) -> Comment:
+        """Update comment content"""
+        try:
+            comment = self.get_comment(comment_id)
+            if not comment:
+                raise ValueError("Comment not found")
+            
+            comment.content = content
+            comment.updated_at = datetime.utcnow()
+            self.db.commit()
+            self.db.refresh(comment)
+            
+            logger.info(f"✅ Comment updated: {comment_id}")
+            return comment
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error updating comment: {str(e)}")
+            raise
+    
+    def delete_comment(self, comment_id: str) -> bool:
+        """Delete a comment"""
+        try:
+            comment = self.get_comment(comment_id)
+            if not comment:
+                raise ValueError("Comment not found")
+            
+            self.db.delete(comment)
+            self.db.commit()
+            
+            logger.info(f"✅ Comment deleted: {comment_id}")
+            return True
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error deleting comment: {str(e)}")
+            raise
+    
+    # ============================================
+    # Task Weight Operations
+    # ============================================
+    
+    def create_task_weight(self, task_weight_data: TaskWeightCreate) -> TaskWeight:
+        """Create a new task weight"""
+        try:
+            # Check if task weight already exists
+            existing = self.db.query(TaskWeight).filter(
+                TaskWeight.task_name == task_weight_data.task_name
+            ).first()
+            
+            if existing:
+                raise ValueError(f"Task weight already exists for: {task_weight_data.task_name}")
+            
+            task_weight = TaskWeight(
+                task_name=task_weight_data.task_name,
+                weight=task_weight_data.weight
+            )
+            
+            self.db.add(task_weight)
+            self.db.commit()
+            self.db.refresh(task_weight)
+            
+            logger.info(f"✅ Task weight created: {task_weight.id} ({task_weight.task_name}: {task_weight.weight})")
+            return task_weight
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error creating task weight: {str(e)}")
+            raise
+    
+    def get_task_weight(self, task_weight_id: str) -> Optional[TaskWeight]:
+        """Get task weight by ID"""
+        try:
+            task_weight = self.db.query(TaskWeight).filter(
+                TaskWeight.id == task_weight_id
+            ).first()
+            if not task_weight:
+                logger.warning(f"Task weight not found: {task_weight_id}")
+            return task_weight
+        except Exception as e:
+            logger.error(f"Error getting task weight: {str(e)}")
+            return None
+    
+    def get_task_weight_by_name(self, task_name: str) -> Optional[TaskWeight]:
+        """Get task weight by task name"""
+        try:
+            task_weight = self.db.query(TaskWeight).filter(
+                TaskWeight.task_name == task_name
+            ).first()
+            return task_weight
+        except Exception as e:
+            logger.error(f"Error getting task weight by name: {str(e)}")
+            return None
+    
+    def list_task_weights(self, skip: int = 0, limit: int = 50) -> List[TaskWeight]:
+        """List all task weights"""
+        try:
+            task_weights = self.db.query(TaskWeight).order_by(
+                TaskWeight.weight.desc()
+            ).offset(skip).limit(limit).all()
+            return task_weights
+        except Exception as e:
+            logger.error(f"Error listing task weights: {str(e)}")
+            return []
+    
+    def update_task_weight(self, task_weight_id: str, **kwargs) -> TaskWeight:
+        """Update task weight"""
+        try:
+            task_weight = self.get_task_weight(task_weight_id)
+            if not task_weight:
+                raise ValueError("Task weight not found")
+            
+            for key, value in kwargs.items():
+                if hasattr(task_weight, key) and value is not None:
+                    setattr(task_weight, key, value)
+            
+            task_weight.updated_at = datetime.utcnow()
+            self.db.commit()
+            self.db.refresh(task_weight)
+            
+            logger.info(f"✅ Task weight updated: {task_weight_id}")
+            return task_weight
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error updating task weight: {str(e)}")
+            raise
+    
+    def delete_task_weight(self, task_weight_id: str) -> bool:
+        """Delete a task weight"""
+        try:
+            task_weight = self.get_task_weight(task_weight_id)
+            if not task_weight:
+                raise ValueError("Task weight not found")
+            
+            self.db.delete(task_weight)
+            self.db.commit()
+            
+            logger.info(f"✅ Task weight deleted: {task_weight_id}")
+            return True
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error deleting task weight: {str(e)}")
+            raise

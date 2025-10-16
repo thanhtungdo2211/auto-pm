@@ -23,6 +23,7 @@ class Candidate(BaseModel):
     name: str
     role: Optional[str]
     email: Optional[str]
+    phone: Optional[str]
     experience_years: Optional[int]
     experience_level: Optional[str]
     skills: Optional[List[str]]
@@ -45,7 +46,7 @@ class GenCVAnalyzer:
     def extract_text_from_file(self, file_path: str) -> str:
         file_path = Path(file_path)
         if not file_path.exists():
-            raise FileNotFoundError(f"❌ File không tồn tại: {file_path}")
+            raise FileNotFoundError(f"File không tồn tại: {file_path}")
 
         if file_path.suffix.lower() == ".pdf":
             reader = PdfReader(file_path)
@@ -54,8 +55,9 @@ class GenCVAnalyzer:
             doc = docx.Document(file_path)
             text = "\n".join([p.text for p in doc.paragraphs])
         else:
-            raise ValueError("❌ Chỉ hỗ trợ file PDF hoặc DOCX.")
+            raise ValueError("Chỉ hỗ trợ file PDF hoặc DOCX.")
         return text.strip()
+    
     def query(self, cv_path: str):
         """
         Phân tích nội dung CV (đã trích xuất text từ PDF/DOCX)
@@ -83,6 +85,7 @@ class GenCVAnalyzer:
                 "name": "<string>",
                 "role": "<string>",
                 "email": "<string>",
+                "phone": "<string>",
                 "experience_years": <int>,
                 "experience_level": "<string>",
                 "skills": ["skill_1", "skill_2", ...],
@@ -107,6 +110,7 @@ class GenCVAnalyzer:
             - `"name"`: The candidate’s full name. Prioritize names found at the beginning of the CV or in the contact section.  
             - `"email"`: The candidate’s email address, if available.  
             - `"role"`: The job title or position applied for (e.g., “Backend Developer”, “Data Scientist”, etc.).  
+            - `"phone"`: The candidate’s phone number, if available.
 
             2 **Experience**
             - `"experience_years"`: Total years of professional experience, estimated based on sections like "Work Experience", "Employment", or "Professional Experience".  
@@ -156,62 +160,63 @@ class GenCVAnalyzer:
         return response
 
 # Example usage
-# if __name__ == "__main__":
-#     cv_path = "/home/mq-dev/tungdt/auto-pm/data/cv_test.pdf"
-#     try:
-#         bot = GenCVAnalyzer()
-#         result = bot.query(cv_path)
-#         print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
-#     #     Sample output
-#     # {
-#     #   "candidates": [
-#     #     {
-#     #       "id": "string",
-#     #       "name": "Đỗ Thanh Tùng",
-#     #       "role": "AI Engineer",
-#     #       "email": "tung.0982548086@gmail.com",
-#     #       "experience_years": 2,
-#     #       "experience_level": "Junior",
-#     #       "skills": [
-#     #         "Python",
-#     #         "C/C++",
-#     #         "PyTorch",
-#     #         "TensorFlow",
-#     #         "OpenCV",
-#     #         "Numpy",
-#     #         "YOLOv7",
-#     #         "YOLOv5n",
-#     #         "YOLOv8n",
-#     #         "Docker",
-#     #         "StreamLit",
-#     #         "PaddleOCR",
-#     #         "VietOCR",
-#     #         "DB"
-#     #       ],
-#     #       "strengths": [
-#     #         "Strong logical thinking",
-#     #         "Proactive learner"
-#     #       ],
-#     #       "projects": [
-#     #         {
-#     #           "name": "Drowning Detection",
-#     #           "role": "Member",
-#     #           "contribution": "Developed a system for detecting drowning using YOLOv7 and Grid Tracker, achieving high accuracy."
-#     #         },
-#     #         {
-#     #           "name": "Invoice Extraction",
-#     #           "role": "Member",
-#     #           "contribution": "Built an invoice information extraction system using DB for text detection and Transformer OCR for text recognition."
-#     #         },
-#     #         {
-#     #           "name": "Violence Detection",
-#     #           "role": "Member",
-#     #           "contribution": "Developed a violence detection system using Yolov5n, Yolov7tiny, Yolov8n, and implemented identity verification using CNN."
-#     #         }
-#     #       ],
-#     #       "note": null
-#     #     }
-#     #   ]
-#     # }
-#     except Exception as e:
-#         print(f"❌ Error: {e}")
+if __name__ == "__main__":
+    cv_path = "/home/mq-dev/tungdt/auto-pm/data/cv_test.pdf"
+    try:
+        bot = GenCVAnalyzer()
+        result = bot.query(cv_path)
+        print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+    #     Sample output
+    # {
+    #   "candidates": [
+    #     {
+    #       "id": "string",
+    #       "name": "Đỗ Thanh Tùng",
+    #       "role": "AI Engineer",
+    #       "email": "tung.0982548086@gmail.com",
+    #       "phone": "0982548086",
+    #       "experience_years": 2,
+    #       "experience_level": "Junior",
+    #       "skills": [
+    #         "Python",
+    #         "C/C++",
+    #         "PyTorch",
+    #         "TensorFlow",
+    #         "OpenCV",
+    #         "Numpy",
+    #         "YOLOv7",
+    #         "YOLOv5n",
+    #         "YOLOv8n",
+    #         "Docker",
+    #         "StreamLit",
+    #         "PaddleOCR",
+    #         "VietOCR",
+    #         "DB"
+    #       ],
+    #       "strengths": [
+    #         "Strong logical thinking",
+    #         "Proactive learner"
+    #       ],
+    #       "projects": [
+    #         {
+    #           "name": "Drowning Detection",
+    #           "role": "Member",
+    #           "contribution": "Developed a system for detecting drowning using YOLOv7 and Grid Tracker, achieving high accuracy."
+    #         },
+    #         {
+    #           "name": "Invoice Extraction",
+    #           "role": "Member",
+    #           "contribution": "Built an invoice information extraction system using DB for text detection and Transformer OCR for text recognition."
+    #         },
+    #         {
+    #           "name": "Violence Detection",
+    #           "role": "Member",
+    #           "contribution": "Developed a violence detection system using Yolov5n, Yolov7tiny, Yolov8n, and implemented identity verification using CNN."
+    #         }
+    #       ],
+    #       "note": null
+    #     }
+    #   ]
+    # }
+    except Exception as e:
+        print(f"Error: {e}")

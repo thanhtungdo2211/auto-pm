@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 from enum import Enum
@@ -6,16 +6,27 @@ from enum import Enum
 # ============ Request Schemas ============
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    email: EmailStr
+    email: Optional[EmailStr] = None  # Made optional for Zalo users
     phone: Optional[str] = None
-    cv: Optional[str] = None  # File path
-    cv_data: Optional[Dict[str, Any]] = None  # Extracted CV data
+    cv: Optional[str] = None
+    cv_data: Optional[Dict[str, Any]] = None
     zalo_user_id: Optional[str] = None
     description: Optional[str] = None
     additional_info: Optional[Dict[str, Any]] = None
     skills: Optional[List[str]] = []
     role: Optional[str] = "staff"
     is_active: Optional[bool] = True
+    
+    @field_validator('email', 'zalo_user_id')
+    @classmethod
+    def validate_identifier(cls, v, info):
+        """At least one of email or zalo_user_id must be provided"""
+        if info.field_name == 'email':
+            return v
+        # Check if at least one identifier exists
+        if not v and not info.data.get('email'):
+            raise ValueError('Either email or zalo_user_id must be provided')
+        return v
     
     class Config:
         json_schema_extra = {
@@ -106,6 +117,32 @@ class CommentCreate(BaseModel):
                 "task_id": "uuid-of-task",
                 "project_id": "uuid-of-project",
                 "content": "This is a comment"
+            }
+        }
+
+
+class TaskWeightCreate(BaseModel):
+    task_name: str = Field(..., min_length=1, max_length=255)
+    weight: int = Field(..., ge=1, le=100, description="Weight between 1-100")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "task_name": "Backend Development",
+                "weight": 80
+            }
+        }
+
+
+class TaskWeightUpdate(BaseModel):
+    task_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    weight: Optional[int] = Field(None, ge=1, le=100)
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "task_name": "Backend Development",
+                "weight": 85
             }
         }
 
