@@ -1,4 +1,5 @@
 data/*
+uploads/*
 
 # Python bytecode
 __pycache__/

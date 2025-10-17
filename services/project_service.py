@@ -807,6 +807,39 @@ class ProjectService:
             logger.error(f"Error getting comment: {str(e)}")
             return None
     
+    def get_user_comments(self, user_id: str) -> List[Comment]:
+        """Get all comments by a user"""
+        try:
+            comments = self.db.query(Comment).filter(
+                Comment.user_id == user_id
+            ).order_by(Comment.created_at.desc()).all()
+            return comments
+        except Exception as e:
+            logger.error(f"Error getting user comments: {str(e)}")
+            return []
+    
+    def list_comments(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        user_id: str = None,
+        project_id: str = None,
+        task_id: str = None
+    ) -> List[Comment]:
+        """List comments with optional filters and pagination"""
+        try:
+            query = self.db.query(Comment)
+            if user_id:
+                query = query.filter(Comment.user_id == user_id)
+            if project_id:
+                query = query.filter(Comment.project_id == project_id)
+            if task_id:
+                query = query.filter(Comment.task_id == task_id)
+            return query.order_by(Comment.created_at.desc()).offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(f"Error listing comments: {str(e)}")
+            return []
+
     def get_task_comments(self, task_id: str) -> List[Comment]:
         """Get all comments for a task"""
         try:

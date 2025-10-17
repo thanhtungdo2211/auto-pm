@@ -26,7 +26,10 @@ logger = logging.getLogger(__name__)
 agent_service = AgentService()
 zalo_service = ZaloService()
 cv_analyzer = GenCVAnalyzer()
-zalo_webhook_service = ZaloWebhookService(cv_analyzer=cv_analyzer)
+zalo_webhook_service = ZaloWebhookService(
+    zalo_service=zalo_service,
+    cv_analyzer=cv_analyzer
+)
 project_service = ProjectService()
 
 @asynccontextmanager
@@ -235,7 +238,23 @@ async def zalo_webhook(request: dict):
     except Exception as e:
         logger.error(f"Error processing Zalo webhook: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@app.get("/api/get_conversation/{zalo_user_id}")
+async def get_conversation(zalo_user_id: str, count: int=10):
+    """
+    Get conversation history with a user
+    """
+    try:
+        conversation = await zalo_service.get_conversation(zalo_user_id, count)
+        return {
+            "status": "success",
+            "user_id": zalo_user_id,
+            "conversation": conversation
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving conversation for user {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @app.post("/api/users/create")
 async def create_user(user_data: UserCreate):
     """
@@ -439,6 +458,61 @@ async def create_task(task_data: TaskCreate):
         logger.error(f"Error creating task: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/api/tasks")
+async def list_tasks(
+    skip: int = 0,
+    limit: int = 20,
+    project_id: str | None = None,
+    status: str | None = None,
+    priority: str | None = None,
+    assigned_user_id: str | None = None,
+):
+    """
+    List tasks with pagination and optional filters:
+      - project_id
+      - status
+      - priority
+      - assigned_user_id (filters tasks that have an assignment for this user)
+    """
+    try:
+        tasks = project_service.list_tasks(skip=skip, limit=limit)
+
+        # Apply simple in-memory filters
+        if project_id:
+            tasks = [t for t in tasks if t.project_id == project_id]
+        if status:
+            tasks = [t for t in tasks if t.status == status]
+        if priority:
+            tasks = [t for t in tasks if t.priority == priority]
+        if assigned_user_id:
+            # get assignments for the user (use a large limit to be safe)
+            assignments = project_service.list_assignments(skip=0, limit=10000, user_id=assigned_user_id)
+            task_ids_for_user = {a.task_id for a in assignments}
+            tasks = [t for t in tasks if t.id in task_ids_for_user]
+
+        return {
+            "status": "success",
+            "count": len(tasks),
+            "tasks": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "description": task.description,
+                    "project_id": task.project_id,
+                    "priority": task.priority,
+                    "status": task.status,
+                    "deadline": task.deadline,
+                    "requirements": task.requirements or [],
+                    "assignments_count": len(project_service.get_task_assignments(task.id)),
+                    "created_at": task.created_at,
+                    "updated_at": task.updated_at
+                } for task in tasks
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error listing tasks: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @app.get("/api/tasks/{task_id}")
 async def get_task(task_id: str, detailed: bool = False):
     """Get task by ID, optionally with details"""
@@ -604,6 +678,46 @@ async def create_comment(comment_data: CommentCreate):
         logger.error(f"❌ Error creating comment: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/api/comments")
+async def list_comments(
+    skip: int = 0,
+    limit: int = 50,
+    user_id: str | None = None,
+    project_id: str | None = None,
+    task_id: str | None = None
+):
+    """
+    List comments with pagination and optional filters:
+      - user_id
+      - project_id
+      - task_id
+    """
+    try:
+        comments = project_service.list_comments(
+            skip=skip,
+            limit=limit,
+            user_id=user_id,
+            project_id=project_id,
+            task_id=task_id
+        )
+        return {
+            "status": "success",
+            "count": len(comments),
+            "comments": [
+                {
+                    "id": c.id,
+                    "user_id": c.user_id,
+                    "task_id": c.task_id,
+                    "project_id": c.project_id,
+                    "content": c.content,
+                    "created_at": c.created_at,
+                    "updated_at": c.updated_at
+                } for c in comments
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error listing comments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/comments/{comment_id}")
 async def get_comment(comment_id: str):
