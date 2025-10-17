@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 import logging
 from datetime import datetime, timedelta
 from typing import Dict
-from schemas import UserCreate
+from app.schemas import UserCreate
 from services.zalo_service import ZaloService
 from services.zalo_webhook_service import ZaloWebhookService
 from services.project_service import ProjectService

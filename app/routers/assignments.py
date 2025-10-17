@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from schemas import AssignmentRequest
+from app.schemas import AssignmentRequest
 from services.project_service import ProjectService
 
 router = APIRouter(

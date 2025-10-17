@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from schemas import TaskCreate
+from app.schemas import TaskCreate
 from services.project_service import ProjectService
 
 router = APIRouter(

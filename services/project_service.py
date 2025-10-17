@@ -2,12 +2,12 @@ import logging
 from datetime import datetime
 from typing import Optional, List
 
-from database import SessionLocal
-from models import (
+from app.database import SessionLocal
+from app.models import (
     User, Project, Task, 
     Assignment, ProjectMember, Comment, TaskWeight
 )
-from schemas import (
+from app.schemas import (
     UserCreate, ProjectCreate, TaskCreate, 
     CommentCreate, TaskWeightCreate
 )

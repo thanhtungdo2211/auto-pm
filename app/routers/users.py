@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from schemas import UserCreate
+from app.schemas import UserCreate
 from services.project_service import ProjectService
 
 router = APIRouter(

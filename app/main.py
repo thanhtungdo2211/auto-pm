@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 
-from database import init_db
+from app.database import init_db
 
 # Import routers
-from routers import (
+from app.routers import (
     users,
     projects,
     tasks,

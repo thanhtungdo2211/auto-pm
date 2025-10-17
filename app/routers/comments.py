@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from schemas import CommentCreate
+from app.schemas import CommentCreate
 from services.project_service import ProjectService
 
 router = APIRouter(
