@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +14,97 @@ class ZaloWebhookService:
     Processes business logic for user registration and HR approval workflow
     """
     
-    def __init__(self, zalo_service, cv_analyzer=None):
+    def __init__(self, zalo_service, cv_analyzer=None, chatbot_service=None, project_service=None):
         """
         Args:
             zalo_service: Instance of ZaloService for API calls
             cv_analyzer: CV analysis service
+            chatbot_service: Chatbot agent service for general conversations
+            project_service: Project service for user lookup
         """
         self.zalo_service = zalo_service
         self.cv_analyzer = cv_analyzer
+        self.chatbot_service = chatbot_service
+        self.project_service = project_service
         self.hr_user_id = os.getenv("HR_USER_ID", "")
-        self.upload_dir = Path("uploads/cvs")
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create separate upload directories
+        self.upload_dir = Path("uploads")
+        self.cv_dir = self.upload_dir / "cvs"
+        self.wbs_dir = self.upload_dir / "wbs"
+        self.cv_dir.mkdir(parents=True, exist_ok=True)
+        self.wbs_dir.mkdir(parents=True, exist_ok=True)
         
         # In-memory storage (use database in production)
         self._cv_cache = {}
         self._pending_registrations = {}
+        self._recent_messages_with_attachments = {}
+    
+    def _get_user_role(self, zalo_user_id: str) -> str:
+        """
+        Determine user role based on Zalo ID
+        
+        Returns:
+            str: 'hr', 'manager', 'staff', or 'unknown'
+        """
+        # Check if HR
+        if zalo_user_id == self.hr_user_id:
+            return 'hr'
+        
+        # Check in database
+        if self.project_service:
+            user = self.project_service.get_user_by_zalo_id(zalo_user_id)
+            if user:
+                return user.role or 'staff'
+
+        return 'unknown'
+    
+    def _detect_file_type(self, file_name: str, user_role: str) -> str:
+        """
+        Detect file type based on filename pattern and user role
+        
+        Args:
+            file_name: Name of the file
+            user_role: Role of the user sending the file
+            
+        Returns:
+            str: 'cv', 'wbs', 'unknown'
+        """
+        file_name_lower = file_name.lower()
+        
+        # CV patterns - only for HR or unknown users
+        if user_role in ['hr', 'unknown']:
+            cv_patterns = [
+                r'cv[-_\.]',          # cv-, cv_, cv.
+                r'[-_]cv[-_\.]',      # -cv-, _cv_, -cv., _cv.
+                r'^cv\.',             # cv.pdf
+                r'resume',
+                r'curriculum',
+                r'ho[-_]so'           # hồ sơ
+            ]
+            
+            for pattern in cv_patterns:
+                if re.search(pattern, file_name_lower):
+                    return 'cv'
+        
+        # WBS patterns - only for managers
+        if user_role == 'manager':
+            wbs_patterns = [
+                r'wbs[-_\.]',                           # wbs-, wbs_, wbs.
+                r'[-_]wbs[-_\.]',                       # -wbs-, _wbs_
+                r'^wbs\.',                              # wbs.xlsx
+                r'work[-_]breakdown',
+                r'phan[-_]chia[-_]cong[-_]viec',       # phân chia công việc
+                r'ke[-_]hoach',                         # kế hoạch
+                r'task[-_]breakdown',
+                r'project[-_]plan'
+            ]
+            
+            for pattern in wbs_patterns:
+                if re.search(pattern, file_name_lower):
+                    return 'wbs'
+        
+        return 'unknown'
     
     async def handle_webhook_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -40,6 +117,7 @@ class ZaloWebhookService:
             handlers = {
                 "user_send_text": self.handle_text_message,
                 "user_send_file": self.handle_file_message,
+                "user_send_image": self.handle_image_message,
                 "follow": self.handle_follow_event
             }
             
@@ -90,43 +168,362 @@ class ZaloWebhookService:
                     "user_id": user_id
                 }
             
-            return {"status": "success", "action": "message_received"}
+            # Handle general conversation with chatbot
+            if self.chatbot_service:
+                logger.info(f"Sending message to chatbot for user {user_id}")
+                chatbot_response = await self.chatbot_service.send_query(user_id, text)
+                
+                if chatbot_response:
+                    await self.zalo_service.send_message(user_id, chatbot_response)
+                    return {
+                        "status": "success",
+                        "action": "chatbot_response_sent",
+                        "user_id": user_id,
+                        "query": text,
+                        "response": chatbot_response
+                    }
+                else:
+                    fallback_message = "Xin lỗi, tôi không thể trả lời lúc này. Vui lòng thử lại sau."
+                    await self.zalo_service.send_message(user_id, fallback_message)
+                    return {
+                        "status": "error",
+                        "action": "chatbot_failed",
+                        "user_id": user_id,
+                        "message": "Chatbot service unavailable"
+                    }
+            else:
+                logger.warning("Chatbot service not configured")
+                return {
+                    "status": "success",
+                    "action": "message_received",
+                    "note": "Chatbot not configured"
+                }
         
         except Exception as e:
             logger.error(f"Error handling text message: {str(e)}")
             raise
     
+    async def handle_image_message(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle image uploads"""
+        try:
+            message = event_data.get("message", {})
+            user_id = event_data.get("sender", {}).get("id")
+            
+            logger.info(f"Received image from {user_id} - Images are not processed")
+            
+            await self.zalo_service.send_message(
+                user_id,
+                "📸 Hệ thống hiện tại chưa hỗ trợ xử lý ảnh.\n\n" +
+                "Vui lòng gửi:\n" +
+                "- File PDF cho CV\n" +
+                "- File Excel/PDF cho WBS"
+            )
+            
+            return {
+                "status": "ignored",
+                "action": "image_not_supported",
+                "user_id": user_id
+            }
+        
+        except Exception as e:
+            logger.error(f"Error handling image message: {str(e)}")
+            raise
+    
     async def handle_file_message(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle file uploads (CV PDFs)"""
+        """Handle file uploads (CV PDFs, WBS files)"""
         try:
             message = event_data.get("message", {})
             attachments = message.get("attachments", [])
             user_id = event_data.get("sender", {}).get("id")
             
+            # Determine user role
+            user_role = self._get_user_role(user_id)
+            logger.info(f"📎 File received from {user_id} (role: {user_role})")
+            
+            # Store that user sent an attachment
+            self._recent_messages_with_attachments[user_id] = {
+                'type': 'file',
+                'timestamp': datetime.now()
+            }
+            
             for attachment in attachments:
                 if attachment.get("type") == "file":
                     file_url = attachment.get("payload", {}).get("url")
-                    file_name = attachment.get("payload", {}).get("name", "cv.pdf")
+                    file_name = attachment.get("payload", {}).get("name", "file")
+                    file_size = attachment.get("payload", {}).get("size", 0)
                     
-                    if file_url and file_name.lower().endswith('.pdf'):
-                        # Download CV using ZaloService
-                        cv_path = await self._download_and_save_cv(file_url, user_id, file_name)
-                        
-                        # Extract CV information
-                        cv_data = await self.extract_cv_information(cv_path)
-                        
+                    logger.info(f"Processing file: {file_name} ({file_size} bytes)")
+                    
+                    # Detect file type based on name and role
+                    file_type = self._detect_file_type(file_name, user_role)
+                    
+                    # Handle CV file
+                    if file_type == 'cv':
+                        return await self._handle_cv_file(file_url, file_name, user_id, user_role)
+                    
+                    # Handle WBS file
+                    elif file_type == 'wbs':
+                        return await self._handle_wbs_file(file_url, file_name, user_id, user_role)
+                    
+                    # Unknown file type
+                    else:
+                        await self._send_file_type_error(user_id, file_name, user_role)
                         return {
-                            "status": "success",
-                            "action": "cv_received",
-                            "user_id": user_id,
-                            "cv_path": str(cv_path),
-                            "cv_data": cv_data
+                            "status": "error",
+                            "message": "Unknown file type",
+                            "file_name": file_name,
+                            "user_role": user_role
                         }
             
-            return {"status": "error", "message": "No valid PDF file found"}
+            return {"status": "error", "message": "No valid file found"}
         
         except Exception as e:
             logger.error(f"Error handling file message: {str(e)}")
+            raise
+    
+    async def _handle_cv_file(
+        self, 
+        file_url: str, 
+        file_name: str, 
+        user_id: str,
+        user_role: str
+    ) -> Dict[str, Any]:
+        """Handle CV file processing"""
+        try:
+            # Only HR and unknown users can submit CV
+            if user_role not in ['hr', 'unknown']:
+                await self.zalo_service.send_message(
+                    user_id,
+                    "❌ Bạn không thể gửi CV.\n\nChỉ ứng viên mới có thể gửi CV để đăng ký."
+                )
+                return {
+                    "status": "error",
+                    "message": "User not allowed to submit CV",
+                    "user_role": user_role
+                }
+            
+            # Check if file is PDF
+            if not file_name.lower().endswith('.pdf'):
+                await self.zalo_service.send_message(
+                    user_id,
+                    f"⚠️ File '{file_name}' không phải là PDF.\n\n" +
+                    "Vui lòng gửi CV dưới dạng file PDF."
+                )
+                return {
+                    "status": "error",
+                    "message": "CV must be PDF",
+                    "file_name": file_name
+                }
+            
+            # Download CV
+            cv_path = await self._download_and_save_file(
+                file_url, 
+                user_id, 
+                file_name,
+                self.cv_dir
+            )
+            
+            # Extract CV information
+            cv_data = await self.extract_cv_information(cv_path)
+            
+            logger.info(f"✅ CV processed for user {user_id}")
+            
+            return {
+                "status": "success",
+                "action": "cv_received",
+                "user_id": user_id,
+                "cv_path": str(cv_path),
+                "cv_data": cv_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling CV file: {str(e)}")
+            await self.zalo_service.send_message(
+                user_id,
+                "❌ Lỗi xử lý CV. Vui lòng thử lại sau."
+            )
+            raise
+    
+    async def _handle_wbs_file(
+        self, 
+        file_url: str, 
+        file_name: str, 
+        user_id: str,
+        user_role: str
+    ) -> Dict[str, Any]:
+        """Handle WBS file processing"""
+        try:
+            # Only managers can submit WBS
+            if user_role != 'manager':
+                await self.zalo_service.send_message(
+                    user_id,
+                    "❌ Bạn không có quyền gửi WBS.\n\n" +
+                    "Chỉ Manager mới có thể tạo WBS cho dự án."
+                )
+                return {
+                    "status": "error",
+                    "message": "User not allowed to submit WBS",
+                    "user_role": user_role
+                }
+            
+            # Download WBS file
+            wbs_path = await self._download_and_save_file(
+                file_url,
+                user_id,
+                file_name,
+                self.wbs_dir
+            )
+            
+            # Read file content and convert to string
+            wbs_content = await self._read_file_as_string(wbs_path)
+            
+            # Send to chatbot with file content (query = None for file processing)
+            if self.chatbot_service:
+                logger.info(f"📤 Sending WBS to chatbot for processing")
+                
+                chatbot_response = await self.chatbot_service.send_query_with_file(
+                    user_id=user_id,
+                    query=None,  # None to indicate file-only processing
+                    file_content=wbs_content,
+                    file_name=file_name
+                )
+                
+                if chatbot_response:
+                    await self.zalo_service.send_message(user_id, chatbot_response)
+                    
+                    logger.info(f"✅ WBS processed for manager {user_id}")
+                    
+                    return {
+                        "status": "success",
+                        "action": "wbs_received",
+                        "user_id": user_id,
+                        "wbs_path": str(wbs_path),
+                        "chatbot_response": chatbot_response
+                    }
+                else:
+                    await self.zalo_service.send_message(
+                        user_id,
+                        "❌ Không thể xử lý WBS lúc này.\n\nVui lòng thử lại sau."
+                    )
+                    return {
+                        "status": "error",
+                        "message": "Chatbot processing failed"
+                    }
+            else:
+                await self.zalo_service.send_message(
+                    user_id,
+                    "❌ Hệ thống xử lý WBS chưa sẵn sàng."
+                )
+                return {
+                    "status": "error",
+                    "message": "Chatbot service not configured"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error handling WBS file: {str(e)}")
+            await self.zalo_service.send_message(
+                user_id,
+                "❌ Lỗi xử lý WBS. Vui lòng thử lại sau."
+            )
+            raise
+    
+    async def _send_file_type_error(self, user_id: str, file_name: str, user_role: str):
+        """Send error message for unknown file type"""
+        if user_role == 'hr' or user_role == 'unknown':
+            message = f"""❌ File '{file_name}' không được hỗ trợ.
+
+📄 **Để đăng ký làm nhân viên:**
+- Tên file phải chứa: CV, Resume, Curriculum
+- Định dạng: PDF
+- Ví dụ: CV_NguyenVanA.pdf, Resume.pdf
+
+Hoặc gõ "Đăng ký" để được hướng dẫn."""
+        
+        elif user_role == 'manager':
+            message = f"""❌ File '{file_name}' không được hỗ trợ.
+
+📊 **Để tạo WBS cho dự án:**
+- Tên file phải chứa: WBS, Work-Breakdown, Project-Plan
+- Định dạng: Excel (.xlsx), PDF, CSV
+- Ví dụ: WBS_Project.xlsx, Work-Breakdown-Structure.pdf
+
+File WBS sẽ được phân tích tự động để tạo tasks."""
+        
+        else:
+            message = f"""❌ File '{file_name}' không được hỗ trợ.
+
+**Loại file được phép:**
+- 📄 CV (PDF) - Dành cho ứng viên
+- 📊 WBS (Excel/PDF) - Dành cho Manager"""
+        
+        await self.zalo_service.send_message(user_id, message)
+    
+    async def _download_and_save_file(
+        self, 
+        file_url: str, 
+        user_id: str, 
+        file_name: str,
+        target_dir: Path
+    ) -> Path:
+        """Download file and save to disk"""
+        try:
+            # Use ZaloService to download
+            file_content = await self.zalo_service.download_file(file_url)
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_filename = f"{user_id}_{timestamp}_{file_name}"
+            file_path = target_dir / safe_filename
+            
+            # Save file
+            with open(file_path, "wb") as f:
+                f.write(file_content)
+            
+            logger.info(f"✅ File saved: {file_path}")
+            return file_path
+        
+        except Exception as e:
+            logger.error(f"Error downloading and saving file: {str(e)}")
+            raise
+    
+    async def _read_file_as_string(self, file_path: Path) -> str:
+        """Read file content and convert to string"""
+        try:
+            file_ext = file_path.suffix.lower()
+            
+            # Handle PDF
+            if file_ext == '.pdf':
+                import PyPDF2
+                with open(file_path, 'rb') as f:
+                    pdf_reader = PyPDF2.PdfReader(f)
+                    text = ""
+                    for page in pdf_reader.pages:
+                        text += page.extract_text() + "\n"
+                    return text
+            
+            # Handle Excel
+            elif file_ext in ['.xlsx', '.xls']:
+                import pandas as pd
+                df = pd.read_excel(file_path)
+                return df.to_string()
+            
+            # Handle CSV
+            elif file_ext == '.csv':
+                import pandas as pd
+                df = pd.read_csv(file_path)
+                return df.to_string()
+            
+            # Handle text files
+            elif file_ext in ['.txt', '.md']:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            
+            else:
+                logger.warning(f"Unsupported file type: {file_ext}")
+                return f"[File type {file_ext} not supported for text extraction]"
+                
+        except Exception as e:
+            logger.error(f"Error reading file as string: {str(e)}")
             raise
     
     async def handle_follow_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:

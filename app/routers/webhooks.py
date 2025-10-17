@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 import logging
 from datetime import datetime, timedelta
 from typing import Dict
@@ -6,6 +6,8 @@ from app.schemas import UserCreate
 from services.zalo_service import ZaloService
 from services.zalo_webhook_service import ZaloWebhookService
 from services.project_service import ProjectService
+from services.chatbot_agent_service import ChatbotAgentService
+from services.analysis_cv import GenCVAnalyzer
 
 router = APIRouter(
     prefix="/api/zalo",
@@ -14,19 +16,18 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
-# Import global services (these should be injected via dependency injection in production)
-# For now, we'll initialize them here
-from services.analysis_cv import GenCVAnalyzer
-
 zalo_service = ZaloService()
 cv_analyzer = GenCVAnalyzer()
+chatbot_service = ChatbotAgentService()  
+project_service = ProjectService()
 zalo_webhook_service = ZaloWebhookService(
     zalo_service=zalo_service,
-    cv_analyzer=cv_analyzer
+    cv_analyzer=cv_analyzer,
+    chatbot_service=chatbot_service,
+    project_service=project_service  # Add project_service
 )
-project_service = ProjectService()
 
-# Cache for processed events
+# Cache for processed events to prevent duplicates
 processed_events: Dict[str, datetime] = {}
 
 
@@ -41,21 +42,26 @@ def cleanup_old_events():
         del processed_events[event_id]
 
 
-@router.post("/webhook")
-async def zalo_webhook(request: dict):
-    """Handle Zalo webhook events"""
+def generate_event_id(request: dict) -> str:
+    """Generate unique event ID from request"""
+    event_name = request.get('event_name', '')
+    timestamp = request.get('timestamp', '')
+    sender_id = request.get('sender', {}).get('id', '')
+    msg_id = request.get('message', {}).get('msg_id', '')
+    
+    # Use msg_id if available for better uniqueness
+    if msg_id:
+        return f"{event_name}_{msg_id}_{sender_id}"
+    return f"{event_name}_{timestamp}_{sender_id}"
+
+
+async def process_webhook_async(request: dict, event_id: str):
+    """
+    Process webhook asynchronously
+    This runs in the background after returning 200 to Zalo
+    """
     try:
-        # Cleanup old events
-        cleanup_old_events()
-        
-        # Create idempotency key from request
-        event_id = f"{request.get('event_name', '')}_{request.get('timestamp', '')}_{request.get('sender', {}).get('id', '')}"
-        
-        # Check if already processed
-        if event_id in processed_events:
-            logger.info(f"Event already processed: {event_id}")
-            return {"status": "duplicate", "message": "Event already processed"}
-        
+        print(request)
         result = await zalo_webhook_service.handle_webhook_event(request)
         
         # Handle CV submission
@@ -80,15 +86,7 @@ async def zalo_webhook(request: dict):
             # Send to HR for approval
             await zalo_webhook_service.notify_hr(registration_id, cv_data)
             
-            # Mark event as processed
-            processed_events[event_id] = datetime.now()
-            
             logger.info(f"✅ CV submitted and pending HR approval: {registration_id}")
-            return {
-                "status": "success",
-                "action": "pending_approval",
-                "registration_id": registration_id
-            }
         
         # Handle HR approval
         elif result.get("action") == "hr_approved":
@@ -102,7 +100,7 @@ async def zalo_webhook(request: dict):
                     zalo_webhook_service.hr_user_id,
                     f"❌ Registration ID không tồn tại: {registration_id}"
                 )
-                return {"status": "error", "message": "Registration not found"}
+                return
             
             cv_data = pending["cv_data"]
             user_id_zalo = pending["user_id_zalo"]
@@ -126,9 +124,6 @@ async def zalo_webhook(request: dict):
                 # Remove pending registration
                 zalo_webhook_service.remove_pending_registration(registration_id)
                 
-                # Mark event as processed
-                processed_events[event_id] = datetime.now()
-                
                 # Send approval notification to candidate
                 await zalo_webhook_service.send_approval_notification(
                     user_id_zalo,
@@ -150,7 +145,6 @@ async def zalo_webhook(request: dict):
                 )
                 
                 logger.info(f"✅ User approved and created: {user.id}")
-                return {"status": "success", "user_id": user.id}
                 
             except ValueError as e:
                 logger.error(f"❌ User creation error: {str(e)}")
@@ -158,7 +152,6 @@ async def zalo_webhook(request: dict):
                     zalo_webhook_service.hr_user_id,
                     f"❌ Lỗi tạo tài khoản: {str(e)}"
                 )
-                return {"status": "error", "message": str(e)}
         
         # Handle HR decline
         elif result.get("action") == "hr_declined":
@@ -172,16 +165,13 @@ async def zalo_webhook(request: dict):
                     zalo_webhook_service.hr_user_id,
                     f"❌ Registration ID không tồn tại: {registration_id}"
                 )
-                return {"status": "error", "message": "Registration not found"}
+                return
             
             cv_data = pending["cv_data"]
             user_id_zalo = pending["user_id_zalo"]
             
             # Remove pending registration
             zalo_webhook_service.remove_pending_registration(registration_id)
-            
-            # Mark event as processed
-            processed_events[event_id] = datetime.now()
             
             # Send rejection notification to candidate
             await zalo_webhook_service.send_rejection_notification(
@@ -196,13 +186,50 @@ async def zalo_webhook(request: dict):
             )
             
             logger.info(f"✅ Registration declined: {registration_id}")
-            return {"status": "success", "action": "declined"}
         
-        return {"status": "success", "result": result}
+        # Chatbot responses are already handled in handle_text_message
+        logger.info(f"✅ Webhook processed successfully: {event_id}")
     
     except Exception as e:
-        logger.error(f"❌ Error processing Zalo webhook: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error processing webhook async: {str(e)}", exc_info=True)
+
+
+@router.post("/webhook")
+async def zalo_webhook(request: dict, background_tasks: BackgroundTasks):
+    """
+    Handle Zalo webhook events
+    Returns 200 immediately and processes in background
+    """
+    try:
+        # Cleanup old events
+        cleanup_old_events()
+        
+        # Generate unique event ID
+        event_id = generate_event_id(request)
+        
+        # Check if already processed (duplicate prevention)
+        if event_id in processed_events:
+            logger.info(f"⚠️ Duplicate event ignored: {event_id}")
+            return {"status": "ok", "message": "Event already processed"}
+        
+        # Mark event as being processed immediately
+        processed_events[event_id] = datetime.now()
+        
+        # Log the event
+        event_name = request.get('event_name', 'unknown')
+        sender_id = request.get('sender', {}).get('id', 'unknown')
+        logger.info(f"📥 Webhook received: {event_name} from {sender_id} | Event ID: {event_id}")
+        
+        # Add background task for async processing
+        background_tasks.add_task(process_webhook_async, request, event_id)
+        
+        # Return 200 immediately to prevent Zalo timeout
+        return {"status": "ok", "event_id": event_id}
+    
+    except Exception as e:
+        logger.error(f"❌ Error in webhook handler: {str(e)}", exc_info=True)
+        # Still return 200 to prevent retries
+        return {"status": "error", "message": "Internal error, will not retry"}
 
 
 @router.get("/conversation/{zalo_user_id}")

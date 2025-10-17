@@ -473,6 +473,58 @@ class ProjectService:
         """Update task status"""
         return self.update_task(task_id, status=status)
     
+    def delete_task(self, task_id: str, force: bool = False) -> bool:
+        """
+        Delete a task
+        
+        Args:
+            task_id: Task ID to delete
+            force: If True, also delete all assignments for this task
+            
+        Returns:
+            bool: True if deleted successfully
+            
+        Raises:
+            ValueError: If task not found or has assignments without force
+        """
+        try:
+            task = self.get_task(task_id)
+            if not task:
+                raise ValueError("Task not found")
+            
+            # Check for assignments
+            assignments = self.get_task_assignments(task_id)
+            
+            if assignments and not force:
+                raise ValueError(
+                    f"Cannot delete task with {len(assignments)} assignment(s). Use force=True to delete anyway."
+                )
+            
+            # Delete assignments if force is True
+            if force and assignments:
+                for assignment in assignments:
+                    self.db.delete(assignment)
+                logger.info(f"Deleted {len(assignments)} assignment(s) for task {task_id}")
+            
+            # Delete comments for this task
+            comments = self.get_task_comments(task_id)
+            for comment in comments:
+                self.db.delete(comment)
+            if comments:
+                logger.info(f"Deleted {len(comments)} comment(s) for task {task_id}")
+            
+            # Delete the task
+            self.db.delete(task)
+            self.db.commit()
+            
+            logger.info(f"✅ Task deleted: {task_id}")
+            return True
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"❌ Error deleting task: {str(e)}")
+            raise
+
     # ============================================
     # Assignment Operations
     # ============================================

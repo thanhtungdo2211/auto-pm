@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from app.schemas import TaskCreate
+from app.schemas import TaskCreate, TaskUpdate
 from services.project_service import ProjectService
 
 router = APIRouter(
@@ -28,6 +28,7 @@ async def create_task(task_data: TaskCreate):
             "priority": task.priority,
             "status": task.status,
             "deadline": task.deadline,
+            "complete_at": task.complete_at,
             "requirements": task.requirements,
             "created_at": task.created_at
         }
@@ -83,6 +84,7 @@ async def list_tasks(
                     "priority": task.priority,
                     "status": task.status,
                     "deadline": task.deadline,
+                    "complete_at": task.complete_at,
                     "requirements": task.requirements or [],
                     "assignments_count": len(project_service.get_task_assignments(task.id)),
                     "created_at": task.created_at,
@@ -121,6 +123,7 @@ async def get_task(task_id: str, detailed: bool = False):
                     "priority": task.priority,
                     "status": task.status,
                     "deadline": task.deadline,
+                    "complete_at": task.complete_at,
                     "requirements": task.requirements or [],
                     "created_at": task.created_at,
                     "updated_at": task.updated_at
@@ -130,6 +133,160 @@ async def get_task(task_id: str, detailed: bool = False):
         raise
     except Exception as e:
         logger.error(f"Error getting task: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/{task_id}")
+async def update_task(task_id: str, task_data: TaskUpdate):
+    """
+    Update task information
+    Only provided fields will be updated
+    """
+    try:
+        # Verify task exists
+        task = project_service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Build update dict (only include provided fields)
+        update_dict = {}
+        if task_data.title is not None:
+            update_dict["title"] = task_data.title
+        if task_data.description is not None:
+            update_dict["description"] = task_data.description
+        if task_data.priority is not None:
+            update_dict["priority"] = task_data.priority
+        if task_data.status is not None:
+            update_dict["status"] = task_data.status
+        if task_data.deadline is not None:
+            update_dict["deadline"] = task_data.deadline
+        if task_data.complete_at is not None:
+            update_dict["complete_at"] = task_data.complete_at
+        if task_data.requirements is not None:
+            update_dict["requirements"] = task_data.requirements
+        if task_data.additional_info is not None:
+            update_dict["additional_info"] = task_data.additional_info
+        
+        # Update task
+        updated_task = project_service.update_task(task_id, **update_dict)
+        
+        logger.info(f"✅ Task updated via API: {task_id}")
+        
+        return {
+            "status": "success",
+            "message": "Task updated successfully",
+            "task": {
+                "id": updated_task.id,
+                "title": updated_task.title,
+                "description": updated_task.description,
+                "project_id": updated_task.project_id,
+                "priority": updated_task.priority,
+                "status": updated_task.status,
+                "deadline": updated_task.deadline,
+                "complete_at": updated_task.complete_at,
+                "requirements": updated_task.requirements or [],
+                "created_at": updated_task.created_at,
+                "updated_at": updated_task.updated_at
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"❌ Error updating task: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.patch("/{task_id}/status")
+async def update_task_status(task_id: str, status: str):
+    """
+    Update only the task status
+    Valid statuses: pending, in_progress, completed, cancelled
+    """
+    try:
+        # Verify task exists
+        task = project_service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Validate status
+        valid_statuses = ["pending", "in_progress", "completed", "cancelled"]
+        if status not in valid_statuses:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            )
+        
+        # Update status
+        updated_task = project_service.update_task_status(task_id, status)
+        
+        logger.info(f"✅ Task status updated: {task_id} -> {status}")
+        
+        return {
+            "status": "success",
+            "message": f"Task status updated to '{status}'",
+            "task_id": task_id,
+            "new_status": updated_task.status,
+            "updated_at": updated_task.updated_at
+        }
+    
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"❌ Error updating task status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/{task_id}")
+async def delete_task(task_id: str, force: bool = False):
+    """
+    Delete a task
+    
+    - By default, only tasks with no assignments can be deleted
+    - Use force=true to delete task and all its assignments
+    """
+    try:
+        # Verify task exists
+        task = project_service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Check for assignments
+        assignments = project_service.get_task_assignments(task_id)
+        
+        if assignments and not force:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete task with {len(assignments)} assignment(s). Use force=true to delete anyway."
+            )
+        
+        # Delete task (will cascade delete assignments if force=true)
+        success = project_service.delete_task(task_id, force=force)
+        
+        if success:
+            logger.info(f"✅ Task deleted: {task_id} (force={force})")
+            return {
+                "status": "success",
+                "message": "Task deleted successfully",
+                "task_id": task_id,
+                "assignments_deleted": len(assignments) if force else 0
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete task")
+    
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"❌ Error deleting task: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

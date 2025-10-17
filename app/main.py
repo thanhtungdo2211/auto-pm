@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -8,17 +8,15 @@ from app.database import init_db
 
 # Import routers
 from app.routers import (
-    users,
-    projects,
-    tasks,
-    assignments,
-    comments,
-    task_weights,
-    webhooks
+    users, projects, tasks, assignments, 
+    comments, task_weights, webhooks, chatbot  
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +55,7 @@ app.include_router(assignments.router)
 app.include_router(comments.router)
 app.include_router(task_weights.router)
 app.include_router(webhooks.router)
+app.include_router(chatbot.router)
 
 # ============================================
 # Health Check Endpoint
@@ -70,10 +69,10 @@ async def health_check():
 
 # Backward compatibility: redirect old webhook endpoint to new one
 @app.post("/webhook-zalooa")
-async def zalo_webhook_redirect(request: dict):
+async def zalo_webhook_redirect(request: dict, background_tasks: BackgroundTasks):
     """Redirect to new webhook endpoint for backward compatibility"""
-    from routers.webhooks import zalo_webhook
-    return await zalo_webhook(request)
+    from app.routers.webhooks import zalo_webhook
+    return await zalo_webhook(request, background_tasks)
 
 
 # if __name__ == "__main__":

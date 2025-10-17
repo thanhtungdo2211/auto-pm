@@ -90,6 +90,41 @@ class TaskCreate(BaseModel):
             }
         }
 
+class TaskUpdate(BaseModel):
+    """Schema for updating a task - all fields are optional"""
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    priority: Optional[str] = Field(None, pattern="^(low|medium|high|urgent)$")
+    status: Optional[str] = Field(None, pattern="^(pending|in_progress|completed|cancelled)$")
+    deadline: Optional[datetime] = None
+    complete_at: Optional[datetime] = None
+    requirements: Optional[List[str]] = None
+    additional_info: Optional[Dict[str, Any]] = None
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        if v is not None and v not in ['low', 'medium', 'high', 'urgent']:
+            raise ValueError('Priority must be one of: low, medium, high, urgent')
+        return v
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        if v is not None and v not in ['pending', 'in_progress', 'completed', 'cancelled']:
+            raise ValueError('Status must be one of: pending, in_progress, completed, cancelled')
+        return v
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "Updated Task Title",
+                "description": "Updated description",
+                "priority": "high",
+                "status": "in_progress",
+                "deadline": "2024-12-31T23:59:59"
+            }
+        }
 
 class AssignmentRequest(BaseModel):
     user_id: str = Field(..., description="User ID")
