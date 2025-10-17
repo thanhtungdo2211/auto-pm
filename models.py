@@ -107,8 +107,8 @@ class TaskWeight(Base):
     __tablename__ = "task_weights"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_name = Column(String(255), nullable=False)
-    weight = Column(Integer, nullable=False)
+    task_name = Column(String(255), nullable=False, unique=True, index=True)
+    weight = Column(JSON, nullable=False)  # Changed from Integer to JSON
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

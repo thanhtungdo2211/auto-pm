@@ -123,28 +123,86 @@ class CommentCreate(BaseModel):
 
 class TaskWeightCreate(BaseModel):
     task_name: str = Field(..., min_length=1, max_length=255)
-    weight: int = Field(..., ge=1, le=100, description="Weight between 1-100")
+    weight: Dict[str, float] = Field(
+        ..., 
+        description="Weight by experience level (e.g., {'senior': 1.0, 'middle': 0.5, 'junior': 0.3})"
+    )
+    
+    @field_validator('weight')
+    @classmethod
+    def validate_weight(cls, v):
+        """Validate weight values are between 0 and 1"""
+        if not v:
+            raise ValueError("Weight cannot be empty")
+        
+        for level, weight_value in v.items():
+            if not isinstance(weight_value, (int, float)):
+                raise ValueError(f"Weight value for '{level}' must be a number")
+            if weight_value < 0 or weight_value > 1:
+                raise ValueError(f"Weight value for '{level}' must be between 0 and 1")
+        
+        return v
     
     class Config:
         json_schema_extra = {
             "example": {
                 "task_name": "Backend Development",
-                "weight": 80
+                "weight": {
+                    "senior": 1.0,
+                    "middle": 0.6,
+                    "junior": 0.3
+                }
             }
         }
 
 
 class TaskWeightUpdate(BaseModel):
     task_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    weight: Optional[int] = Field(None, ge=1, le=100)
+    weight: Optional[Dict[str, float]] = Field(
+        None,
+        description="Weight by experience level"
+    )
+    
+    @field_validator('weight')
+    @classmethod
+    def validate_weight(cls, v):
+        """Validate weight values are between 0 and 1"""
+        if v is None:
+            return v
+            
+        if not v:
+            raise ValueError("Weight cannot be empty")
+        
+        for level, weight_value in v.items():
+            if not isinstance(weight_value, (int, float)):
+                raise ValueError(f"Weight value for '{level}' must be a number")
+            if weight_value < 0 or weight_value > 1:
+                raise ValueError(f"Weight value for '{level}' must be between 0 and 1")
+        
+        return v
     
     class Config:
         json_schema_extra = {
             "example": {
                 "task_name": "Backend Development",
-                "weight": 85
+                "weight": {
+                    "senior": 1.0,
+                    "middle": 0.7,
+                    "junior": 0.4
+                }
             }
         }
+
+
+class TaskWeightResponse(BaseModel):
+    id: str
+    task_name: str
+    weight: Dict[str, float]  # Changed from int to Dict
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # ============ Response Schemas ============

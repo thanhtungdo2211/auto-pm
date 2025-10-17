@@ -109,8 +109,8 @@ CREATE INDEX idx_comments_project_id ON comments(project_id);
 -- Create task_weights table
 CREATE TABLE task_weights (
     id VARCHAR(255) PRIMARY KEY,
-    task_name VARCHAR(255) NOT NULL,
-    weight INTEGER NOT NULL,
+    task_name VARCHAR(255) NOT NULL UNIQUE,
+    weight JSONB NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
