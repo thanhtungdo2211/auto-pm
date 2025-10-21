@@ -45,7 +45,7 @@ class ChatbotAgentService:
                 logger.info(f"Sending query to chatbot for user {user_id}: {query[:50]}...")
                 
                 response = await client.post(
-                    f"{self.chatbot_url}/chat",
+                    f"{self.chatbot_url}",
                     json=payload
                 )
                 
@@ -89,18 +89,22 @@ class ChatbotAgentService:
             return None
         
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:  # 2 min timeout for file processing
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                # If query is None, use a default message for file processing
+                # query_text = query if query else "Phân tích file này"  # ← Changed
+                query_text = ""
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
-                    "query": query if query else "",  # Empty string if None
+                    "query": query_text,  # ← Use query_text instead of empty string
                     "file": file_content
                 }
                 
                 logger.info(f"Sending file to chatbot for user {user_id}")
-                logger.info(f"File: {file_name}, Content length: {len(file_content)} chars, Query: {query or 'None'}")
+                logger.info(f"File: {file_name}, Content length: {len(file_content)} chars, Query: '{query_text}'")
+                logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file'])}, file_content={file_content}")
                 
                 response = await client.post(
-                    f"{self.chatbot_url}/chat",
+                    f"{self.chatbot_url}",
                     json=payload
                 )
                 

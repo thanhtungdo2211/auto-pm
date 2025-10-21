@@ -1,10 +1,12 @@
+import logging
 import os
-from typing import Dict, Any, Optional
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-import logging
-import re
+from typing import Any, Dict, Optional
+
+from services.utils import read_file_content
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class ZaloWebhookService:
             user = self.project_service.get_user_by_zalo_id(zalo_user_id)
             if user:
                 return user.role or 'staff'
-
+            
         return 'unknown'
     
     def _detect_file_type(self, file_name: str, user_role: str) -> str:
@@ -374,8 +376,21 @@ class ZaloWebhookService:
                 self.wbs_dir
             )
             
-            # Read file content and convert to string
-            wbs_content = await self._read_file_as_string(wbs_path)
+            # Read file content using utils function
+            wbs_content = read_file_content(str(wbs_path))
+            
+            # Check if reading was successful
+            if isinstance(wbs_content, str) and wbs_content.startswith("[ERROR]"):
+                logger.error(f"Failed to read WBS file: {wbs_content}")
+                await self.zalo_service.send_message(
+                    user_id,
+                    f"❌ Không thể đọc file WBS.\n\n{wbs_content}"
+                )
+                return {
+                    "status": "error",
+                    "message": "Failed to read WBS file",
+                    "error": wbs_content
+                }
             
             # Send to chatbot with file content (query = None for file processing)
             if self.chatbot_service:

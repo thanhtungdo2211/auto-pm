@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import logging
 
+from services.chatbot_agent_service import ChatbotAgentService
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chatbot", tags=["Chatbot"])
@@ -17,12 +19,13 @@ class ChatResponse(BaseModel):
     response: str
     success: bool
 
+chatbot_service = ChatbotAgentService()
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_bot(request: ChatRequest):
     """
     Test chatbot integration directly
     """
-    from main import chatbot_service
     
     try:
         result = await chatbot_service.get_conversation_response(
