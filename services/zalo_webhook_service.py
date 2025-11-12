@@ -5,7 +5,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-
+from app.Qdrant import QdrantDB
+from services.sync_message_service import SyncMessageService
 from services.utils import read_file_content
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,10 @@ class ZaloWebhookService:
         self.cv_dir.mkdir(parents=True, exist_ok=True)
         self.wbs_dir.mkdir(parents=True, exist_ok=True)
         
+        #Long memory 
+        self.qdrantdb = QdrantDB(vector_size= 768)
+        self.embed = SyncMessageService()
+
         # In-memory storage (use database in production)
         self._cv_cache = {}
         self._pending_registrations = {}
@@ -173,10 +178,36 @@ class ZaloWebhookService:
             # Handle general conversation with chatbot
             if self.chatbot_service:
                 logger.info(f"Sending message to chatbot for user {user_id}")
-                chatbot_response = await self.chatbot_service.send_query(user_id, text)
+
+                ###
+                result = self.qdrantdb.search_one(user_id, self.embed.embed_query(text))
+                logging.info(result)
+                logging.info(self.qdrantdb.list_points(user_id))
+                chatbot_response = await self.chatbot_service.send_long_memory(user_id=user_id, 
+                                                            query=text,
+                                                            long_memory=str(result))
+                ###
+
+                # chatbot_response = await self.chatbot_service.send_query(user_id, text)
                 
                 if chatbot_response:
                     await self.zalo_service.send_message(user_id, chatbot_response)
+                    self.qdrantdb.upsert_one(
+                        user_id = user_id, 
+                        vector = self.embed.embed_query(text),
+                        payload = {
+                            "role": "user",
+                            "text": text
+                        } 
+                    )
+                    self.qdrantdb.upsert_one(
+                        user_id = user_id, 
+                        vector = self.embed.embed_query(chatbot_response),
+                        payload = {
+                            "role": "chatbot",
+                            "text": chatbot_response
+                        } 
+                    )
                     return {
                         "status": "success",
                         "action": "chatbot_response_sent",
@@ -184,7 +215,19 @@ class ZaloWebhookService:
                         "query": text,
                         "response": chatbot_response
                     }
+                    
                 else:
+                    self.qdrantdb.upsert_one(
+                        user_id = user_id, 
+                        vector = self.embed.embed_query(text),
+                        payload = {
+                            "role": "user",
+                            "text": text
+                        } 
+                    )
+                    result = self.qdrantdb.search_one(user_id, self.embed.embed_query(text))
+                    logging.info(result)
+                    logging.info(self.qdrantdb.list_points(user_id))
                     fallback_message = "Xin lỗi, tôi không thể trả lời lúc này. Vui lòng thử lại sau."
                     await self.zalo_service.send_message(user_id, fallback_message)
                     return {

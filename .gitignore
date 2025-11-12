@@ -117,3 +117,7 @@ Thumbs.db
 # Misc
 coverage.xml
 *.log
+
+
+#Model 
+models/

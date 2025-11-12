@@ -39,7 +39,8 @@ class ChatbotAgentService:
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
                     "query": query,
-                    "file": ""  # Empty file for text-only queries
+                    "file": "",  # Empty file for text-only queries
+                    "long_memory": ""
                 }
                 
                 logger.info(f"Sending query to chatbot for user {user_id}: {query[:50]}...")
@@ -90,18 +91,19 @@ class ChatbotAgentService:
         
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                # If query is None, use a default message for file processing
-                # query_text = query if query else "Phân tích file này"  # ← Changed
-                query_text = ""
+                # If query is None, use empty string
+                query_text = query if query else ""
+                
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
-                    "query": query_text,  # ← Use query_text instead of empty string
-                    "file": file_content
+                    "query": query_text,
+                    "file": file_content,
+                    "long_memory": ""
                 }
                 
                 logger.info(f"Sending file to chatbot for user {user_id}")
                 logger.info(f"File: {file_name}, Content length: {len(file_content)} chars, Query: '{query_text}'")
-                logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file'])}, file_content={file_content}")
+                logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file'])}")
                 
                 response = await client.post(
                     f"{self.chatbot_url}",
@@ -124,6 +126,61 @@ class ChatbotAgentService:
             logger.error(f"Error calling chatbot API with file: {str(e)}")
             return None
     
+    async def send_long_memory(
+        self, 
+        user_id: str, 
+        query: str,
+        long_memory: str
+    ) -> Optional[str]:
+        """
+        Send only long memory to chatbot (no query, no file)
+        Used for updating user context/history without triggering a response
+        
+        Args:
+            user_id: User ID
+            long_memory: Long-term memory content (conversation history, user context, etc.)
+            
+        Returns:
+            str: Chatbot response or None if error
+        """
+        if not self.chatbot_url:
+            logger.error("Chatbot URL not configured")
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                payload = {
+                    "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
+                    "query": query,  # Empty query
+                    "file": "",   # Empty file
+                    "long_memory": long_memory
+                }
+                
+                logger.info(f"Sending long memory to chatbot for user {user_id}")
+                logger.info(f"Long memory length: {len(long_memory)} chars")
+                logger.info(f"Long memory preview: {long_memory[:200]}...")
+                
+                response = await client.post(
+                    f"{self.chatbot_url}",
+                    json=payload
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    chatbot_response = data.get("response", "")
+                    logger.info(f"✅ Long memory updated for user {user_id}")
+                    return chatbot_response
+                else:
+                    logger.error(f"Chatbot API error: {response.status_code} - {response.text}")
+                    return None
+        
+        except httpx.TimeoutException:
+            logger.error(f"Chatbot API timeout for user {user_id} with long memory")
+            return "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau."
+        except Exception as e:
+            logger.error(f"Error calling chatbot API with long memory: {str(e)}")
+            return None
+
     async def get_conversation_response(
         self, 
         user_id: str, 

@@ -102,16 +102,17 @@ def read_file_content(file_path: str) -> str:
 if __name__ == "__main__":
     test_file = "/home/mq-dev/tungdt/auto-pm/data/WBS_AI_Team_MQ_final(ProjectSchedule_FaceSpa).csv"
     content = read_file_content(test_file)
-    print(f"Type: {type(content)}")  # Should be <class 'str'>
-    print(f"Length: {len(content)}")
-    print(f"First 500 chars:\n{content[:500]}")
+    print(content)
+    # print(f"Type: {type(content)}")  # Should be <class 'str'>
+    # print(f"Length: {len(content)}")
+    # print(f"First 500 chars:\n{content[:500]}")
     
-    # Test JSON payload
-    import httpx
-    payload = {
-        "user_id": 123,
-        "query": "",
-        "file": content  # This will be auto-escaped by json.dumps
-    }
-    print("\n=== JSON Payload ===")
-    print(json.dumps(payload, ensure_ascii=False, indent=2)[:1000])
+    # # Test JSON payload
+    # import httpx
+    # payload = {
+    #     "user_id": 123,
+    #     "query": "",
+    #     "file": content  # This will be auto-escaped by json.dumps
+    # }
+    # print("\n=== JSON Payload ===")
+    # print(json.dumps(payload, ensure_ascii=False, indent=2)[:1000])
