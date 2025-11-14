@@ -97,19 +97,20 @@ class ChatbotAgentService:
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
                     "query": query_text,
-                    "file": file_content,
+                    "file_content": file_content,
                     "long_memory": ""
                 }
-                
+                print(payload)
                 logger.info(f"Sending file to chatbot for user {user_id}")
                 logger.info(f"File: {file_name}, Content length: {len(file_content)} chars, Query: '{query_text}'")
-                logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file'])}")
+                logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file_content'])}")
                 
                 response = await client.post(
                     f"{self.chatbot_url}",
                     json=payload
                 )
                 
+
                 if response.status_code == 200:
                     data = response.json()
                     chatbot_response = data.get("response", "")

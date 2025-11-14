@@ -66,6 +66,7 @@ class QdrantDB:
     # Tìm kiếm
     # --------------------------
     def search_one(self, user_id: str, query_vector: List[float], limit: int = 5):
+        collection_name = self._ensure_collection(user_id)
         collection_name = self._get_collection_name(user_id)
         results = self.client.search(
             collection_name=collection_name,

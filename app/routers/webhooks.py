@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 import logging
 from datetime import datetime, timedelta
 from typing import Dict
+import requests
+from typing import Optional
+
 from app.schemas import UserCreate
 from services.zalo_service import ZaloService
 from services.zalo_webhook_service import ZaloWebhookService
@@ -30,6 +33,111 @@ zalo_webhook_service = ZaloWebhookService(
 # Cache for processed events to prevent duplicates
 processed_events: Dict[str, datetime] = {}
 
+PLANE_API_URL = "http://localhost:8000"  # Your Plane backend URL
+PLANE_API_KEY = "plane_api_fe15a1874a304088b027ce4bbe8afc23"
+WORKSPACE_SLUG = "workspace-mq"
+
+async def create_plane_user_and_add_to_workspace(
+    email: str,
+    first_name: str,
+    last_name: str,
+    username: Optional[str] = None,
+    role: int = 20  # Default role for workspace member
+) -> dict:
+    """
+    Create user in Plane and add to workspace
+    
+    Args:
+        email: User email
+        first_name: User first name
+        last_name: User last name
+        username: Username (defaults to email prefix)
+        role: Workspace role (20 = member)
+    
+    Returns:
+        dict with user_created, member_added status
+    """
+    result = {
+        "user_created": False,
+        "member_added": False,
+        "user_data": None,
+        "member_data": None,
+        "errors": []
+    }
+    
+    # Generate username from email if not provided
+    if not username:
+        username = email.split('@')[0]
+    
+    # Step 1: Create user
+    try:
+        user_payload = {
+            "email": email,
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "password": f"TempPass_{username}123!"  # Generate temporary password
+        }
+        
+        logger.info(f"📤 Creating Plane user: {email}")
+        
+        user_response = requests.post(
+            f"{PLANE_API_URL}/api/users/",
+            headers={"Content-Type": "application/json"},
+            json=user_payload,
+            timeout=10
+        )
+        
+        if user_response.status_code in [200, 201]:
+            result["user_created"] = True
+            result["user_data"] = user_response.json()
+            logger.info(f"✅ Plane user created: {email}")
+        else:
+            error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
+            result["errors"].append(error_msg)
+            logger.error(f"❌ {error_msg}")
+            return result  # Stop here if user creation fails
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Error creating user: {str(e)}"
+        result["errors"].append(error_msg)
+        logger.error(f"❌ {error_msg}")
+        return result
+    
+    # Step 2: Add user to workspace
+    try:
+        member_payload = {
+            "email": email,
+            "role": role
+        }
+        
+        logger.info(f"📤 Adding user to workspace: {WORKSPACE_SLUG}")
+        
+        member_response = requests.post(
+            f"{PLANE_API_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": PLANE_API_KEY
+            },
+            json=member_payload,
+            timeout=10
+        )
+        
+        if member_response.status_code in [200, 201]:
+            result["member_added"] = True
+            result["member_data"] = member_response.json()
+            logger.info(f"✅ User added to workspace: {WORKSPACE_SLUG}")
+        else:
+            error_msg = f"Failed to add member: {member_response.status_code} - {member_response.text}"
+            result["errors"].append(error_msg)
+            logger.error(f"❌ {error_msg}")
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Error adding member to workspace: {str(e)}"
+        result["errors"].append(error_msg)
+        logger.error(f"❌ {error_msg}")
+    
+    return result
 
 def cleanup_old_events():
     """Remove events older than 1 hour"""
@@ -61,7 +169,6 @@ async def process_webhook_async(request: dict, event_id: str):
     This runs in the background after returning 200 to Zalo
     """
     try:
-        print(request)
         result = await zalo_webhook_service.handle_webhook_event(request)
         
         # Handle CV submission
@@ -121,6 +228,25 @@ async def process_webhook_async(request: dict, event_id: str):
             try:
                 user = project_service.create_user(user_create_data)
                 
+                # plane_result = await create_plane_user_and_add_to_workspace(
+                #     email=user.email,
+                #     first_name=user.name.split()[0] if user.name else "User",
+                #     last_name=" ".join(user.name.split()[1:]) if len(user.name.split()) > 1 else "",
+                #     username=user.email.split('@')[0],
+                #     role=20  # Member role
+                # )
+
+                # # Check if Plane integration succeeded
+                # plane_status = ""
+                # if plane_result["user_created"] and plane_result["member_added"]:
+                #     plane_status = "\n✅ Đã tạo tài khoản Plane và thêm vào workspace"
+                # elif plane_result["user_created"]:
+                #     plane_status = "\n⚠️ Đã tạo tài khoản Plane nhưng chưa thêm vào workspace"
+                # else:
+                #     plane_status = "\n❌ Không thể tạo tài khoản Plane"
+                #     if plane_result["errors"]:
+                #         plane_status += f"\nLỗi: {', '.join(plane_result['errors'])}"
+
                 # Remove pending registration
                 zalo_webhook_service.remove_pending_registration(registration_id)
                 

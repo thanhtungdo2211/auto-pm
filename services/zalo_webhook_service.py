@@ -438,7 +438,7 @@ class ZaloWebhookService:
             # Send to chatbot with file content (query = None for file processing)
             if self.chatbot_service:
                 logger.info(f"📤 Sending WBS to chatbot for processing")
-                
+             
                 chatbot_response = await self.chatbot_service.send_query_with_file(
                     user_id=user_id,
                     query=None,  # None to indicate file-only processing
