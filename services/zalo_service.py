@@ -65,7 +65,7 @@ class ZaloService:
             bool: True if message sent successfully
         """
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 headers = {
                     "access_token": self.zalo_access_token,
                     "Content-Type": "application/json"
@@ -161,7 +161,7 @@ class ZaloService:
             bytes: File content
         """
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 headers = {
                     "Authorization": f"Bearer {self.zalo_access_token}"
                 }

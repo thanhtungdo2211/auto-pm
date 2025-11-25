@@ -97,3 +97,89 @@ async def get_user(user_id: str):
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/email/{email}")
+async def get_user_by_email(email: str):
+    """
+    Get user details by email address
+    
+    Args:
+        email: User's email address
+        
+    Returns:
+        User details or 404 if not found
+    """
+    try:
+        user = project_service.get_user_by_email(email)
+        if not user:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"User not found with email: {email}"
+            )
+        
+        return {
+            "status": "success",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "zalo_user_id": user.zalo_user_id,
+                "role": user.role,
+                "skills": user.skills or [],
+                "cv": user.cv,
+                "cv_data": user.cv_data,
+                "description": user.description,
+                "is_active": user.is_active,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user by email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/zalo/{zalo_user_id}")
+async def get_user_by_zalo_id(zalo_user_id: str):
+    """
+    Get user details by Zalo user ID
+    
+    Args:
+        zalo_user_id: User's Zalo ID
+        
+    Returns:
+        User details or 404 if not found
+    """
+    try:
+        user = project_service.get_user_by_zalo_id(zalo_user_id)
+        if not user:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"User not found with Zalo ID: {zalo_user_id}"
+            )
+        
+        return {
+            "status": "success",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "zalo_user_id": user.zalo_user_id,
+                "role": user.role,
+                "skills": user.skills or [],
+                "cv": user.cv,
+                "cv_data": user.cv_data,
+                "description": user.description,
+                "is_active": user.is_active,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user by Zalo ID: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

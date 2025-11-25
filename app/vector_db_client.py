@@ -7,7 +7,6 @@ from qdrant_client.models import PointStruct, VectorParams, Distance
 from typing import List, Dict, Optional
 import uuid
 
-
 class QdrantDB:
     """
     Quản lý kết nối và thao tác với Qdrant vector database.

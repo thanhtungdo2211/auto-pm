@@ -1,7 +1,11 @@
-from google import genai
-from google.genai import types
 import os 
 from dotenv import load_dotenv
+
+from google import genai
+from google.genai import types
+from sentence_transformers import SentenceTransformer
+from pyvi.ViTokenizer import tokenize  
+
 load_dotenv()
 
 class GeminiEmbedding():
@@ -24,8 +28,6 @@ class GeminiEmbedding():
         return embeddings_list
 
 
-from sentence_transformers import SentenceTransformer
-from pyvi.ViTokenizer import tokenize  
 class HuggingFaceEmbedding():
     def __init__(self):
         self.embed = SentenceTransformer("./models/vietnamese-embedding")

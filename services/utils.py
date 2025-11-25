@@ -100,7 +100,7 @@ def read_file_content(file_path: str) -> str:
 
 # Test
 if __name__ == "__main__":
-    test_file = "/home/mq-dev/tungdt/auto-pm/data/WBS_AI_Team_MQ_final(ProjectSchedule_FaceSpa).csv"
+    test_file = "/home/mq-dev/tungdt/auto-pm/data/WBS_WBSdu_an_schedule 1.csv"
     content = read_file_content(test_file)
     print(content)
     # print(f"Type: {type(content)}")  # Should be <class 'str'>

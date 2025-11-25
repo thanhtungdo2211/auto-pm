@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-from app.Qdrant import QdrantDB
+from app.vector_db_client import QdrantDB
 from services.sync_message_service import SyncMessageService
 from services.utils import read_file_content
 

@@ -35,7 +35,7 @@ class ChatbotAgentService:
             return None
         
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
                     "query": query,
@@ -90,7 +90,7 @@ class ChatbotAgentService:
             return None
         
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
                 # If query is None, use empty string
                 query_text = query if query else ""
                 
@@ -149,7 +149,7 @@ class ChatbotAgentService:
             return None
         
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
                 payload = {
                     "user_id": int(user_id) if user_id.isdigit() else hash(user_id) % (10 ** 10),
                     "query": query,  # Empty query
