@@ -25,3 +25,5 @@ langchain_huggingface
 pyvi
 google-genai
 sentence-transformers
+
+apscheduler

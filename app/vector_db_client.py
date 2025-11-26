@@ -2,10 +2,6 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from typing import List, Dict, Optional
 import uuid
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
-from typing import List, Dict, Optional
-import uuid
 
 class QdrantDB:
     """

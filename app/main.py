@@ -5,6 +5,8 @@ import logging
 from datetime import datetime
 
 from app.database import init_db
+from app.scheduler import start_scheduler, shutdown_scheduler
+
 
 # Import routers
 from app.routers import (
@@ -25,9 +27,17 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing database...")
     init_db()
+    
+    # # Start the scheduler
+    # logger.info("Starting task scheduler...")
+    # start_scheduler()
+    
     logger.info("Application started")
     yield
+    
     # Shutdown
+    logger.info("Shutting down scheduler...")
+    shutdown_scheduler()
     logger.info("Application shutdown")
 
 
@@ -66,6 +76,12 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now()}
 
+@app.post("/test/trigger-daily-notifications")
+async def trigger_daily_notifications():
+    """Test endpoint to manually trigger daily notifications"""
+    from app.scheduler import send_daily_task_notifications
+    await send_daily_task_notifications()
+    return {"status": "Notifications triggered"}
 
 # Backward compatibility: redirect old webhook endpoint to new one
 @app.post("/webhook-zalooa")
@@ -73,7 +89,6 @@ async def zalo_webhook_redirect(request: dict, background_tasks: BackgroundTasks
     """Redirect to new webhook endpoint for backward compatibility"""
     from app.routers.webhooks import zalo_webhook
     return await zalo_webhook(request, background_tasks)
-
 
 # if __name__ == "__main__":
 #     import uvicorn

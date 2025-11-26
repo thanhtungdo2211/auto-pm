@@ -36,6 +36,7 @@ venv/
 env.bak/
 venv.bak/
 venv/*
+.env
 
 # PyInstaller
 *.manifest
