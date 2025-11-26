@@ -6,7 +6,7 @@ import json
 
 # Configuration
 ZALO_WEBHOOK_BASE_URL = "http://localhost:5544/api"
-PLANE_BASE_URL = "https://fd2232d3f667.ngrok-free.app"
+PLANE_BASE_URL = "https://475e52cf0f7f.ngrok-free.app"
 WORKSPACE_SLUG = "thang"
 PLANE_API_KEY = "plane_api_d958d52c6c0845cb94b8dadd7fef425e"
 

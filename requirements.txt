@@ -27,3 +27,4 @@ google-genai
 sentence-transformers
 
 apscheduler
+zoneinfo

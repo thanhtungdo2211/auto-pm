@@ -1,7 +1,7 @@
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from services.query_today_task import main as query_today_tasks
 from services.zalo_service import ZaloService
+from zoneinfo import ZoneInfo
 
 scheduler = AsyncIOScheduler()
 zalo_service = ZaloService()
@@ -117,12 +118,19 @@ def start_scheduler():
     """
     Initialize and start the scheduler
     """
+
+    # Schedule coroutines directly - AsyncIOScheduler handles them properly
+    # now = datetime.now()
+    # test_time = now + timedelta(minutes=1)
+
     # Schedule daily task notifications at 8:00 AM
+    asia_tz = ZoneInfo("Asia/Ho_Chi_Minh")
+
     scheduler.add_job(
         send_daily_task_notifications,
-        trigger=CronTrigger(hour=8, minute=0),
+        trigger=CronTrigger(hour=8, minute=0, timezone=asia_tz),
         id="daily_task_notifications",
-        name="Send daily task notifications at 8 AM",
+        name="Send daily task notifications at 08:00 Asia/Ho_Chi_Minh (GMT+7)",
         replace_existing=True
     )
     
