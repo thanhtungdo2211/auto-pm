@@ -29,8 +29,8 @@ async def lifespan(app: FastAPI):
     init_db()
     
     # Start the scheduler
-    logger.info("Starting task scheduler...")
-    start_scheduler()
+    # logger.info("Starting task scheduler...")
+    # start_scheduler()
     
     logger.info("Application started")
     yield
