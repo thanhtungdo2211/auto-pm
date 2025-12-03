@@ -17,7 +17,7 @@ data = {
         "zalo_user_id": "zalo_test_001",
         "description": "Test Account",
         "skills": ["Testing", "QA"],
-        "role": "tester",
+        "role": "staff",
         "cv": "/uploads/cv/test_cv.pdf",
         "cv_data": {
             "experience": "2 years",

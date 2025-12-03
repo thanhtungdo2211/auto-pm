@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import uuid
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -17,19 +18,18 @@ class ZaloWebhookService:
     Processes business logic for user registration and HR approval workflow
     """
     
-    def __init__(self, zalo_service, cv_analyzer=None, chatbot_service=None, project_service=None):
+    def __init__(self, zalo_service, cv_analyzer=None, chatbot_service=None):
         """
         Args:
             zalo_service: Instance of ZaloService for API calls
             cv_analyzer: CV analysis service
             chatbot_service: Chatbot agent service for general conversations
-            project_service: Project service for user lookup
         """
         self.zalo_service = zalo_service
         self.cv_analyzer = cv_analyzer
         self.chatbot_service = chatbot_service
-        self.project_service = project_service
         self.hr_user_id = os.getenv("HR_USER_ID", "")
+        self.plane_api_url = os.getenv("PLANE_API_URL", "http://localhost:8000")
         
         # Create separate upload directories
         self.upload_dir = Path("uploads")
@@ -49,7 +49,7 @@ class ZaloWebhookService:
     
     def _get_user_role(self, zalo_user_id: str) -> str:
         """
-        Determine user role based on Zalo ID
+        Determine user role based on Zalo ID using Plane API
         
         Returns:
             str: 'hr', 'manager', 'staff', or 'unknown'
@@ -58,13 +58,28 @@ class ZaloWebhookService:
         if zalo_user_id == self.hr_user_id:
             return 'hr'
         
-        # Check in database
-        if self.project_service:
-            user = self.project_service.get_user_by_zalo_id(zalo_user_id)
-            if user:
-                return user.role or 'staff'
+        # Check via Plane API
+        try:
+            response = requests.get(
+                f"{self.plane_api_url}/api/zalo-users/{zalo_user_id}/",
+                headers={"Content-Type": "application/json"},
+                timeout=5
+            )
             
-        return 'unknown'
+            if response.status_code == 200:
+                user_data = response.json()
+                zalo_metadata = user_data.get("zalo_metadata", {})
+                return zalo_metadata.get("role", "staff")
+            elif response.status_code == 404:
+                logger.info(f"User not found in Plane: {zalo_user_id}")
+                return 'unknown'
+            else:
+                logger.warning(f"Plane API error: {response.status_code}")
+                return 'unknown'
+                
+        except Exception as e:
+            logger.error(f"Error fetching user role from Plane API: {str(e)}")
+            return 'unknown'
     
     def _detect_file_type(self, file_name: str, user_role: str) -> str:
         """

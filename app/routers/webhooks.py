@@ -5,10 +5,8 @@ from typing import Dict
 import requests
 from typing import Optional
 
-from app.schemas import UserCreate
 from services.zalo_service import ZaloService
 from services.zalo_webhook_service import ZaloWebhookService
-from services.project_service import ProjectService
 from services.chatbot_agent_service import ChatbotAgentService
 from services.analysis_cv import GenCVAnalyzer
 from services.report_handler import ReportHandler
@@ -23,21 +21,19 @@ logger = logging.getLogger(__name__)
 
 zalo_service = ZaloService()
 cv_analyzer = GenCVAnalyzer()
-chatbot_service = ChatbotAgentService()  
-project_service = ProjectService()
+chatbot_service = ChatbotAgentService()
 report_handler = ReportHandler()
 
 zalo_webhook_service = ZaloWebhookService(
     zalo_service=zalo_service,
     cv_analyzer=cv_analyzer,
-    chatbot_service=chatbot_service,
-    project_service=project_service  # Add project_service
+    chatbot_service=chatbot_service
 )
 
 # Cache for processed events to prevent duplicates
 processed_events: Dict[str, datetime] = {}
 
-PLANE_API_URL = "http://localhost:8000"  # Your Plane backend URL
+PLANE_API_URL = "https://e6b5c063c2c1.ngrok-free.app"  # Your Plane backend URL
 PLANE_API_KEY = "plane_api_fe15a1874a304088b027ce4bbe8afc23"
 WORKSPACE_SLUG = "workspace-mq"
 
@@ -256,67 +252,80 @@ async def process_webhook_async(request: dict, event_id: str):
             cv_data = pending["cv_data"]
             user_id_zalo = pending["user_id_zalo"]
             
-            # Create user with full CV data
-            user_create_data = UserCreate(
-                name=cv_data.get("name", "Unknown"),
-                email=cv_data.get("email"),
-                phone=cv_data.get("phone"),
-                cv=pending["cv_path"],
-                cv_data=cv_data,
-                zalo_user_id=user_id_zalo,
-                description=cv_data.get("description", ""),
-                skills=cv_data.get("skills", []),
-                role="staff"
-            )
-            
+            # Create user via Plane API
             try:
-                user = project_service.create_user(user_create_data)
+                # Prepare user data for Plane API
+                name_parts = cv_data.get("name", "User").split()
+                first_name = name_parts[0] if name_parts else "User"
+                last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+                email = cv_data.get("email")
+                username = email.split('@')[0] if email else f"user_{user_id_zalo}"
                 
-                # plane_result = await create_plane_user_and_add_to_workspace(
-                #     email=user.email,
-                #     first_name=user.name.split()[0] if user.name else "User",
-                #     last_name=" ".join(user.name.split()[1:]) if len(user.name.split()) > 1 else "",
-                #     username=user.email.split('@')[0],
-                #     role=20  # Member role
-                # )
-
-                # # Check if Plane integration succeeded
-                # plane_status = ""
-                # if plane_result["user_created"] and plane_result["member_added"]:
-                #     plane_status = "\n✅ Đã tạo tài khoản Plane và thêm vào workspace"
-                # elif plane_result["user_created"]:
-                #     plane_status = "\n⚠️ Đã tạo tài khoản Plane nhưng chưa thêm vào workspace"
-                # else:
-                #     plane_status = "\n❌ Không thể tạo tài khoản Plane"
-                #     if plane_result["errors"]:
-                #         plane_status += f"\nLỗi: {', '.join(plane_result['errors'])}"
-
-                # Remove pending registration
-                zalo_webhook_service.remove_pending_registration(registration_id)
-                
-                # Send approval notification to candidate
-                await zalo_webhook_service.send_approval_notification(
-                    user_id_zalo,
-                    {
-                        "id": user.id,
-                        "name": user.name,
-                        "email": user.email,
-                        "phone": user.phone,
-                        "skills": user.skills,
-                        "experience_years": cv_data.get("experience_years"),
-                        "experience_level": cv_data.get("experience_level")
+                plane_payload = {
+                    "email": email,
+                    "username": username,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "password": f"TempPass_{username}123!",
+                    "zalo_metadata": {
+                        "name": cv_data.get("name", "Unknown"),
+                        "phone": cv_data.get("phone"),
+                        "zalo_user_id": user_id_zalo,
+                        "description": cv_data.get("description", ""),
+                        "skills": cv_data.get("skills", []),
+                        "role": "staff",
+                        "cv": pending["cv_path"],
+                        "cv_data": cv_data,
+                        "additional_info": cv_data.get("additional_info", {})
                     }
+                }
+                
+                logger.info(f"📤 Creating Plane user: {email}")
+                
+                user_response = requests.post(
+                    f"{PLANE_API_URL}/api/users/",
+                    headers={"Content-Type": "application/json"},
+                    json=plane_payload,
+                    timeout=10
                 )
                 
-                # Confirm to HR
-                await zalo_service.send_message(
-                    zalo_webhook_service.hr_user_id,
-                    f"✅ Đã tạo tài khoản cho {user.name}\n📱 SĐT: {user.phone}\n🆔 User ID: {user.id}"
-                )
+                if user_response.status_code in [200, 201]:
+                    user_data = user_response.json()
+                    logger.info(f"✅ Plane user created: {email}")
+                    
+                    # Remove pending registration
+                    zalo_webhook_service.remove_pending_registration(registration_id)
+                    
+                    # Send approval notification to candidate
+                    await zalo_webhook_service.send_approval_notification(
+                        user_id_zalo,
+                        {
+                            "id": user_data.get("id"),
+                            "name": cv_data.get("name"),
+                            "email": email,
+                            "phone": cv_data.get("phone"),
+                            "skills": cv_data.get("skills", []),
+                            "experience_years": cv_data.get("experience_years"),
+                            "experience_level": cv_data.get("experience_level")
+                        }
+                    )
+                    
+                    # Confirm to HR
+                    await zalo_service.send_message(
+                        zalo_webhook_service.hr_user_id,
+                        f"✅ Đã tạo tài khoản Plane cho {cv_data.get('name')}\n📧 Email: {email}\n📱 SĐT: {cv_data.get('phone')}\n🆔 User ID: {user_data.get('id')}"
+                    )
+                    
+                    logger.info(f"✅ User approved and created: {user_data.get('id')}")
+                else:
+                    error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
+                    logger.error(f"❌ {error_msg}")
+                    await zalo_service.send_message(
+                        zalo_webhook_service.hr_user_id,
+                        f"❌ Lỗi tạo tài khoản Plane: {error_msg}"
+                    )
                 
-                logger.info(f"✅ User approved and created: {user.id}")
-                
-            except ValueError as e:
+            except Exception as e:
                 logger.error(f"❌ User creation error: {str(e)}")
                 await zalo_service.send_message(
                     zalo_webhook_service.hr_user_id,
@@ -458,36 +467,63 @@ async def approve_registration(registration_id: str):
         cv_data = pending["cv_data"]
         user_id_zalo = pending["user_id_zalo"]
         
-        # Create user
-        user_create_data = UserCreate(
-            name=cv_data.get("name", "Unknown"),
-            email=cv_data.get("email"),
-            phone=cv_data.get("phone"),
-            cv=pending["cv_path"],
-            cv_data=cv_data,
-            zalo_user_id=user_id_zalo,
-            description=cv_data.get("description", ""),
-            skills=cv_data.get("skills", []),
-            role="staff"
+        # Prepare user data for Plane API
+        name_parts = cv_data.get("name", "User").split()
+        first_name = name_parts[0] if name_parts else "User"
+        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        email = cv_data.get("email")
+        username = email.split('@')[0] if email else f"user_{user_id_zalo}"
+        
+        plane_payload = {
+            "email": email,
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "password": f"TempPass_{username}123!",
+            "zalo_metadata": {
+                "name": cv_data.get("name", "Unknown"),
+                "phone": cv_data.get("phone"),
+                "zalo_user_id": user_id_zalo,
+                "description": cv_data.get("description", ""),
+                "skills": cv_data.get("skills", []),
+                "role": "staff",
+                "cv": pending["cv_path"],
+                "cv_data": cv_data,
+                "additional_info": cv_data.get("additional_info", {})
+            }
+        }
+        
+        # Create user via Plane API
+        user_response = requests.post(
+            f"{PLANE_API_URL}/api/users/",
+            headers={"Content-Type": "application/json"},
+            json=plane_payload,
+            timeout=10
         )
         
-        user = project_service.create_user(user_create_data)
+        if user_response.status_code not in [200, 201]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create Plane user: {user_response.text}"
+            )
+        
+        user_data = user_response.json()
         
         # Remove pending registration
         zalo_webhook_service.remove_pending_registration(registration_id)
         
         # Send notifications
         await zalo_webhook_service.send_approval_notification(user_id_zalo, {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "phone": user.phone
+            "id": user_data.get("id"),
+            "name": cv_data.get("name"),
+            "email": email,
+            "phone": cv_data.get("phone")
         })
         
         return {
             "status": "success",
-            "message": "User approved and created",
-            "user_id": user.id
+            "message": "User approved and created in Plane",
+            "user_id": user_data.get("id")
         }
         
     except Exception as e:

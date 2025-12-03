@@ -4,14 +4,12 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 
-from app.database import init_db
 from app.scheduler import start_scheduler, shutdown_scheduler
 
 
 # Import routers
 from app.routers import (
-    users, projects, tasks, assignments, 
-    comments, task_weights, webhooks, chatbot  
+    webhooks, chatbot  
 )
 
 # Configure logging
@@ -24,10 +22,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Initializing database...")
-    init_db()
-    
     # Start the scheduler
     # logger.info("Starting task scheduler...")
     # start_scheduler()
@@ -58,12 +52,6 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(users.router)
-app.include_router(projects.router)
-app.include_router(tasks.router)
-app.include_router(assignments.router)
-app.include_router(comments.router)
-app.include_router(task_weights.router)
 app.include_router(webhooks.router)
 app.include_router(chatbot.router)
 

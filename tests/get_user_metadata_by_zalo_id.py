@@ -2,10 +2,10 @@ import requests
 import json
 
 # Zalo User ID to search
-zalo_user_id = "zalo_test_001"
+zalo_user_id = "6586865813439202317"
 
 # API endpoint
-url = f"http://localhost:8000/api/zalo-users/{zalo_user_id}/"
+url = f"https://e6b5c063c2c1.ngrok-free.app/api/zalo-users/{zalo_user_id}/"
 
 headers = {
     "Content-Type": "application/json"

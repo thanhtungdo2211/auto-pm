@@ -15,7 +15,6 @@ auto-pm/
 │   ├── task_weights.py              # Task weight management endpoints
 │   └── webhooks.py                  # Zalo webhook and integration endpoints
 ├── services/                        # Business logic services
-│   ├── project_service.py          # Database operations
 │   ├── zalo_service.py             # Zalo API client (low-level)
 │   ├── zalo_webhook_service.py     # Webhook event handler (high-level)
 │   └── analysis_cv.py              # CV analysis service
@@ -235,7 +234,6 @@ Once running, access:
 
 ## Next Steps for Further Improvement
 
-1. **Dependency Injection**: Replace global `project_service` instances with FastAPI dependencies
 2. **Database Sessions**: Use FastAPI dependency for database session management
 3. **Authentication**: Add JWT authentication middleware
 4. **Rate Limiting**: Implement rate limiting per endpoint
