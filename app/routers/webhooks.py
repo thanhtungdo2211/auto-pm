@@ -11,6 +11,8 @@ from services.chatbot_agent_service import ChatbotAgentService
 from services.analysis_cv import GenCVAnalyzer
 from services.report_handler import ReportHandler
 from services.query_today_task import main as query_today_tasks
+from dotenv import load_dotenv
+import os
 
 router = APIRouter(
     prefix="/api/zalo",
@@ -33,9 +35,18 @@ zalo_webhook_service = ZaloWebhookService(
 # Cache for processed events to prevent duplicates
 processed_events: Dict[str, datetime] = {}
 
-PLANE_API_URL = "https://e6b5c063c2c1.ngrok-free.app"  # Your Plane backend URL
-PLANE_API_KEY = "plane_api_fe15a1874a304088b027ce4bbe8afc23"
-WORKSPACE_SLUG = "workspace-mq"
+# Load .env from project root (or environment)
+load_dotenv()
+
+PLANE_API_URL = os.getenv(
+    "PLANE_API_URL",
+    "https://e6b5c063c2c1.ngrok-free.app"  # fallback for local dev
+)
+PLANE_API_KEY = os.getenv(
+    "PLANE_API_KEY",
+    "plane_api_fe15a1874a304088b027ce4bbe8afc23"  # fallback for local dev
+)
+WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "workspace-mq")
 
 async def create_plane_user_and_add_to_workspace(
     email: str,
