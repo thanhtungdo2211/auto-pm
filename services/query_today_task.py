@@ -5,7 +5,7 @@ from datetime import datetime, date
 import json
 
 # Configuration
-PLANE_BASE_URL = "https://4184c1eb210f.ngrok-free.app"
+PLANE_BASE_URL = "https://e6b5c063c2c1.ngrok-free.app"
 WORKSPACE_SLUG = "thang"
 PLANE_API_KEY = "plane_api_d958d52c6c0845cb94b8dadd7fef425e"
 

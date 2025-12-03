@@ -113,19 +113,79 @@ async def send_daily_task_notifications():
     except Exception as e:
         logger.error(f"Error in daily task notification job: {e}", exc_info=True)
 
+async def send_daily_report_request():
+    """Send report request to all staff at 6 PM"""
+    try:
+        logger.info(f"Starting daily report request job at {datetime.now()}")
+        
+        # Query all active users with tasks
+        notification_data = await query_today_tasks()
+        
+        if not notification_data:
+            logger.info("No users to send report request")
+            return
+        
+        success_count = 0
+        failed_count = 0
+        
+        for user in notification_data:
+            zalo_user_id = user.get("zalo_user_id")
+            
+            if not zalo_user_id:
+                logger.warning(f"No Zalo user ID for {user.get('email')} - skipping")
+                failed_count += 1
+                continue
+            
+            try:
+                display_name = user.get('display_name', 'User')
+                task_count = user.get('task_count', 0)
+                
+                message = f"📝 Chào {display_name}!\n\n"
+                message += f"Đã đến 6 giờ chiều, vui lòng gửi báo cáo công việc hôm nay.\n"
+                message += f"Bạn có {task_count} task cần báo cáo.\n\n"
+                message += "Hãy gửi báo cáo theo định dạng:\n"
+                message += "- Task đã làm\n"
+                message += "- Tiến độ (%)\n"
+                message += "- Thời gian đã dùng\n"
+                message += "- Ghi chú (nếu có)\n\n"
+                message += "Ví dụ: Task A: 60%, 3 giờ. Task B: 100%, 4 giờ."
+                
+                sent = await zalo_service.send_message(
+                    user_id=str(zalo_user_id),
+                    text=message,
+                    metadata={
+                        "type": "daily_report_request",
+                        "date": datetime.now().isoformat(),
+                        "expecting_report": True
+                    }
+                )
+                
+                if sent:
+                    logger.info(f"✅ Report request sent to {display_name}")
+                    success_count += 1
+                else:
+                    logger.error(f"❌ Failed to send request to {display_name}")
+                    failed_count += 1
+                
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Error sending request to {user.get('email')}: {e}")
+                failed_count += 1
+        
+        logger.info(f"Report requests completed. Success: {success_count}, Failed: {failed_count}")
+        
+    except Exception as e:
+        logger.error(f"Error in daily report request job: {e}", exc_info=True)
+
 
 def start_scheduler():
     """
     Initialize and start the scheduler
     """
-
-    # Schedule coroutines directly - AsyncIOScheduler handles them properly
-    # now = datetime.now()
-    # test_time = now + timedelta(minutes=1)
-
-    # Schedule daily task notifications at 8:00 AM
     asia_tz = ZoneInfo("Asia/Ho_Chi_Minh")
 
+    # Daily task notifications at 8:00 AM
     scheduler.add_job(
         send_daily_task_notifications,
         trigger=CronTrigger(hour=8, minute=0, timezone=asia_tz),
@@ -134,8 +194,17 @@ def start_scheduler():
         replace_existing=True
     )
     
+    # Daily report request at 6:00 PM
+    scheduler.add_job(
+        send_daily_report_request,
+        trigger=CronTrigger(hour=18, minute=0, timezone=asia_tz),
+        id="daily_report_request",
+        name="Send daily report request at 18:00 Asia/Ho_Chi_Minh (GMT+7)",
+        replace_existing=True
+    )
+    
     scheduler.start()
-    logger.info("Scheduler started. Daily task notifications scheduled for 8:00 AM")
+    logger.info("Scheduler started. Jobs scheduled for 8:00 AM and 6:00 PM")
 
 def shutdown_scheduler():
     """

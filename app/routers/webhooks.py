@@ -11,6 +11,8 @@ from services.zalo_webhook_service import ZaloWebhookService
 from services.project_service import ProjectService
 from services.chatbot_agent_service import ChatbotAgentService
 from services.analysis_cv import GenCVAnalyzer
+from services.report_handler import ReportHandler
+from services.query_today_task import main as query_today_tasks
 
 router = APIRouter(
     prefix="/api/zalo",
@@ -23,6 +25,8 @@ zalo_service = ZaloService()
 cv_analyzer = GenCVAnalyzer()
 chatbot_service = ChatbotAgentService()  
 project_service = ProjectService()
+report_handler = ReportHandler()
+
 zalo_webhook_service = ZaloWebhookService(
     zalo_service=zalo_service,
     cv_analyzer=cv_analyzer,
@@ -171,6 +175,46 @@ async def process_webhook_async(request: dict, event_id: str):
     try:
         result = await zalo_webhook_service.handle_webhook_event(request)
         
+        # Handle daily report submission
+        if result.get("action") == "daily_report_received":
+            user_id = result.get("user_id")
+            report_text = result.get("report_text")
+            
+            logger.info(f"📝 Processing daily report from user {user_id}")
+            
+            # Get user's tasks for today
+            all_users_tasks = await query_today_tasks()
+            
+            # Find this user's tasks
+            user_tasks = None
+            for user_data in all_users_tasks:
+                if str(user_data.get("zalo_user_id")) == str(user_id):
+                    user_tasks = user_data.get("tasks", [])
+                    break
+            
+            if not user_tasks:
+                await zalo_service.send_message(
+                    user_id,
+                    "⚠️ Không tìm thấy task nào được gán cho bạn hôm nay."
+                )
+                return
+            
+            # Process the report
+            process_result = await report_handler.process_staff_report(
+                zalo_user_id=user_id,
+                report_text=report_text,
+                user_tasks=user_tasks
+            )
+            
+            # Send response to user
+            await zalo_service.send_message(
+                user_id,
+                process_result.get("message")
+            )
+            
+            logger.info(f"✅ Daily report processed. Saved: {process_result.get('saved_count', 0)}, Failed: {process_result.get('failed_count', 0)}")
+            return
+
         # Handle CV submission
         if result.get("action") == "cv_received":
             cv_data = result.get("cv_data", {})

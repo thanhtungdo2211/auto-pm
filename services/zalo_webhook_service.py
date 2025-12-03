@@ -139,6 +139,34 @@ class ZaloWebhookService:
             logger.error(f"Error handling webhook event: {str(e)}")
             raise
     
+    def _is_daily_report_message(self, text: str, current_hour: int) -> bool:
+        """
+        Check if message is a daily report
+        
+        Args:
+            text: Message text
+            current_hour: Current hour (0-23)
+        
+        Returns:
+            bool: True if this is a daily report message
+        """
+        # Check time window: 6 PM (18:00) to 10 PM (22:00)
+        # if not (18 <= current_hour <= 22):
+        #     return False
+        
+        # Check for report template keywords
+        report_keywords = [
+            "báo cáo công việc ngày hôm nay",
+            "bao cao cong viec ngay hom nay",
+            "báo cáo công việc",
+            "bao cao cong viec",
+            "report today",
+            "daily report"
+        ]
+        
+        text_lower = text.lower()
+        return any(keyword in text_lower for keyword in report_keywords)
+
     async def handle_text_message(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle text messages from users"""
         try:
@@ -166,6 +194,16 @@ class ZaloWebhookService:
                         "registration_id": registration_id
                     }
             
+            current_hour = datetime.now().hour
+            if self._is_daily_report_message(text, current_hour):
+                logger.info(f"📝 Daily report detected from user {user_id}")
+                return {
+                    "status": "success",
+                    "action": "daily_report_received",
+                    "user_id": user_id,
+                    "report_text": text
+                }
+
             # User registration commands
             if text.lower() in ["đăng ký", "dang ky", "register"]:
                 await self.send_registration_instructions(user_id)

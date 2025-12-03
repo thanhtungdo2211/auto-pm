@@ -9,27 +9,10 @@ url = f"http://localhost:8000/api/workspaces/{workspace_slug}/projects/{project_
 payload = {
     "day": "2024-01-15",
     "daily_tasks": {
-        # "tasks": [
-        #     {
-        #         "id": "task-1",
-        #         "title": "Implement user authentication",
-        #         "status": "in_progress",
-        #         "progress": 60,
-        #         "time_spent": "3h"
-        #     },
-        #     {
-        #         "id": "task-2",
-        #         "title": "Write unit tests",
-        #         "status": "completed",
-        #         "progress": 100,
-        #         "time_spent": "2h"
-        #     }
-        # ],
-        # "blockers": ["Waiting for API documentation"],
-        # "achievements": ["Completed login flow"]
-        "tung": "thang beo"
+        # "user_id":
+        # "tasks": ""
     },
-    "notes": "Good progress today. Need to focus on testing tomorrow."
+    "notes": ""
 }
 
 headers = {

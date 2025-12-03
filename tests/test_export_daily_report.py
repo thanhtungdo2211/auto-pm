@@ -3,7 +3,7 @@ import requests
 import sys
 sys.path.insert(1, ".")
 
-from services.daily_report_exporter import DailyReportExporter
+from services.report_handler import DailyReportExporter
 
 # Configuration
 BASE_URL = "http://localhost:8000"
