@@ -53,7 +53,7 @@ class ChatbotAgentService:
                 if response.status_code == 200:
                     data = response.json()
                     chatbot_response = data.get("response", "")
-                    logger.info(f"✅ Chatbot response received for user {user_id}")
+                    logger.info(f"Chatbot response received for user {user_id}")
                     return chatbot_response
                 else:
                     logger.error(f"Chatbot API error: {response.status_code} - {response.text}")
@@ -114,7 +114,7 @@ class ChatbotAgentService:
                 if response.status_code == 200:
                     data = response.json()
                     chatbot_response = data.get("response", "")
-                    logger.info(f"✅ Chatbot processed file for user {user_id}")
+                    logger.info(f"Chatbot processed file for user {user_id}")
                     return chatbot_response
                 else:
                     logger.error(f"Chatbot API error: {response.status_code} - {response.text}")
@@ -169,7 +169,7 @@ class ChatbotAgentService:
                 if response.status_code == 200:
                     data = response.json()
                     chatbot_response = data.get("response", "")
-                    logger.info(f"✅ Long memory updated for user {user_id}")
+                    logger.info(f"Long memory updated for user {user_id}")
                     return chatbot_response
                 else:
                     logger.error(f"Chatbot API error: {response.status_code} - {response.text}")
