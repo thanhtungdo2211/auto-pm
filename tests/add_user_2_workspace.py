@@ -1,9 +1,12 @@
 import requests
 import json
+import os
 
 # API endpoint
-workspace_slug = "workspace-mq"
-url = f"http://localhost:8000/api/workspaces/{workspace_slug}/add-member/"
+PLANE_BASE_URL = os.getenv("PLANE_API_URL", "https://af3142515b93.ngrok-free.app")
+WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "thang")
+
+url = f"https://{PLANE_BASE_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/"
 
 # Member data
 data = {

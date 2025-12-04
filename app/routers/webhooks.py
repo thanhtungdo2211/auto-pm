@@ -48,107 +48,107 @@ PLANE_API_KEY = os.getenv(
 )
 WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "workspace-mq")
 
-async def create_plane_user_and_add_to_workspace(
-    email: str,
-    first_name: str,
-    last_name: str,
-    username: Optional[str] = None,
-    role: int = 20  # Default role for workspace member
-) -> dict:
-    """
-    Create user in Plane and add to workspace
+# async def create_plane_user_and_add_to_workspace(
+#     email: str,
+#     first_name: str,
+#     last_name: str,
+#     username: Optional[str] = None,
+#     role: int = 20  # Default role for workspace member
+# ) -> dict:
+#     """
+#     Create user in Plane and add to workspace
     
-    Args:
-        email: User email
-        first_name: User first name
-        last_name: User last name
-        username: Username (defaults to email prefix)
-        role: Workspace role (20 = member)
+#     Args:
+#         email: User email
+#         first_name: User first name
+#         last_name: User last name
+#         username: Username (defaults to email prefix)
+#         role: Workspace role (20 = member)
     
-    Returns:
-        dict with user_created, member_added status
-    """
-    result = {
-        "user_created": False,
-        "member_added": False,
-        "user_data": None,
-        "member_data": None,
-        "errors": []
-    }
+#     Returns:
+#         dict with user_created, member_added status
+#     """
+#     result = {
+#         "user_created": False,
+#         "member_added": False,
+#         "user_data": None,
+#         "member_data": None,
+#         "errors": []
+#     }
     
-    # Generate username from email if not provided
-    if not username:
-        username = email.split('@')[0]
+#     # Generate username from email if not provided
+#     if not username:
+#         username = email.split('@')[0]
     
-    # Step 1: Create user
-    try:
-        user_payload = {
-            "email": email,
-            "username": username,
-            "first_name": first_name,
-            "last_name": last_name,
-            "password": f"TempPass_{username}123!"  # Generate temporary password
-        }
+#     # Step 1: Create user
+#     try:
+#         user_payload = {
+#             "email": email,
+#             "username": username,
+#             "first_name": first_name,
+#             "last_name": last_name,
+#             "password": f"TempPass_{username}123!"  # Generate temporary password
+#         }
         
-        logger.info(f"📤 Creating Plane user: {email}")
+#         logger.info(f"📤 Creating Plane user: {email}")
         
-        user_response = requests.post(
-            f"{PLANE_API_URL}/api/users/",
-            headers={"Content-Type": "application/json"},
-            json=user_payload,
-            timeout=10
-        )
+#         user_response = requests.post(
+#             f"{PLANE_API_URL}/api/users/",
+#             headers={"Content-Type": "application/json"},
+#             json=user_payload,
+#             timeout=10
+#         )
         
-        if user_response.status_code in [200, 201]:
-            result["user_created"] = True
-            result["user_data"] = user_response.json()
-            logger.info(f"✅ Plane user created: {email}")
-        else:
-            error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
-            result["errors"].append(error_msg)
-            logger.error(f"❌ {error_msg}")
-            return result  # Stop here if user creation fails
+#         if user_response.status_code in [200, 201]:
+#             result["user_created"] = True
+#             result["user_data"] = user_response.json()
+#             logger.info(f"✅ Plane user created: {email}")
+#         else:
+#             error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
+#             result["errors"].append(error_msg)
+#             logger.error(f"❌ {error_msg}")
+#             return result  # Stop here if user creation fails
     
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Error creating user: {str(e)}"
-        result["errors"].append(error_msg)
-        logger.error(f"❌ {error_msg}")
-        return result
+#     except requests.exceptions.RequestException as e:
+#         error_msg = f"Error creating user: {str(e)}"
+#         result["errors"].append(error_msg)
+#         logger.error(f"❌ {error_msg}")
+#         return result
     
-    # Step 2: Add user to workspace
-    try:
-        member_payload = {
-            "email": email,
-            "role": role
-        }
+#     # Step 2: Add user to workspace
+#     try:
+#         member_payload = {
+#             "email": email,
+#             "role": role
+#         }
         
-        logger.info(f"📤 Adding user to workspace: {WORKSPACE_SLUG}")
+#         logger.info(f"📤 Adding user to workspace: {WORKSPACE_SLUG}")
         
-        member_response = requests.post(
-            f"{PLANE_API_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": PLANE_API_KEY
-            },
-            json=member_payload,
-            timeout=10
-        )
+#         member_response = requests.post(
+#             f"{PLANE_API_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/",
+#             headers={
+#                 "Content-Type": "application/json",
+#                 "x-api-key": PLANE_API_KEY
+#             },
+#             json=member_payload,
+#             timeout=10
+#         )
         
-        if member_response.status_code in [200, 201]:
-            result["member_added"] = True
-            result["member_data"] = member_response.json()
-            logger.info(f"✅ User added to workspace: {WORKSPACE_SLUG}")
-        else:
-            error_msg = f"Failed to add member: {member_response.status_code} - {member_response.text}"
-            result["errors"].append(error_msg)
-            logger.error(f"❌ {error_msg}")
+#         if member_response.status_code in [200, 201]:
+#             result["member_added"] = True
+#             result["member_data"] = member_response.json()
+#             logger.info(f"✅ User added to workspace: {WORKSPACE_SLUG}")
+#         else:
+#             error_msg = f"Failed to add member: {member_response.status_code} - {member_response.text}"
+#             result["errors"].append(error_msg)
+#             logger.error(f"❌ {error_msg}")
     
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Error adding member to workspace: {str(e)}"
-        result["errors"].append(error_msg)
-        logger.error(f"❌ {error_msg}")
+#     except requests.exceptions.RequestException as e:
+#         error_msg = f"Error adding member to workspace: {str(e)}"
+#         result["errors"].append(error_msg)
+#         logger.error(f"❌ {error_msg}")
     
-    return result
+#     return result
 
 def cleanup_old_events():
     """Remove events older than 1 hour"""
@@ -304,6 +304,36 @@ async def process_webhook_async(request: dict, event_id: str):
                     user_data = user_response.json()
                     logger.info(f"✅ Plane user created: {email}")
                     
+                    # Step 2: Add user to workspace
+                    try:
+                        member_payload = {
+                            "email": email,
+                            "role": 15  # Member role
+                        }
+                        
+                        logger.info(f"📤 Adding user to workspace: {WORKSPACE_SLUG}")
+                        
+                        member_response = requests.post(
+                            f"{PLANE_API_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/",
+                            headers={
+                                "Content-Type": "application/json",
+                                "x-api-key": PLANE_API_KEY
+                            },
+                            json=member_payload,
+                            timeout=10
+                        )
+                        
+                        if member_response.status_code in [200, 201]:
+                            logger.info(f"✅ User added to workspace: {WORKSPACE_SLUG}")
+                        else:
+                            error_msg = f"Failed to add member to workspace: {member_response.status_code} - {member_response.text}"
+                            logger.error(f"❌ {error_msg}")
+                            # Continue anyway - user is created
+                    
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"❌ Error adding member to workspace: {str(e)}")
+                        # Continue anyway - user is created
+                    
                     # Remove pending registration
                     zalo_webhook_service.remove_pending_registration(registration_id)
                     
@@ -328,6 +358,7 @@ async def process_webhook_async(request: dict, event_id: str):
                     )
                     
                     logger.info(f"✅ User approved and created: {user_data.get('id')}")
+                
                 else:
                     error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
                     logger.error(f"❌ {error_msg}")

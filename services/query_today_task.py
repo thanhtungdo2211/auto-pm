@@ -3,11 +3,16 @@ import httpx
 from typing import List, Dict, Optional
 from datetime import datetime, date
 import json
+import os
+from dotenv import load_dotenv
 
-# Configuration
-PLANE_BASE_URL = "https://e6b5c063c2c1.ngrok-free.app"
-WORKSPACE_SLUG = "thang"
-PLANE_API_KEY = "plane_api_d958d52c6c0845cb94b8dadd7fef425e"
+# Load environment variables
+load_dotenv('./.env')
+
+# Configuration from .env
+PLANE_BASE_URL = os.getenv("PLANE_API_URL", "https://af3142515b93.ngrok-free.app")
+WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "thang")
+PLANE_API_KEY = os.getenv("PLANE_API_KEY", "plane_api_fe15a1874a304088b027ce4bbe8afc23")
 
 async def get_user_with_zalo_by_id(user_id: str) -> Optional[Dict]:
     """

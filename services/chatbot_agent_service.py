@@ -100,7 +100,7 @@ class ChatbotAgentService:
                     "file_content": file_content,
                     "long_memory": ""
                 }
-                print(payload)
+                # print(payload)
                 logger.info(f"Sending file to chatbot for user {user_id}")
                 logger.info(f"File: {file_name}, Content length: {len(file_content)} chars, Query: '{query_text}'")
                 logger.info(f"Payload preview: user_id={payload['user_id']}, query='{payload['query'][:50]}...', file_length={len(payload['file_content'])}")
