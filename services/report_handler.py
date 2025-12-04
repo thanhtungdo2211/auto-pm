@@ -1,20 +1,27 @@
+import os
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
+
 import httpx
-from datetime import datetime
+from dotenv import load_dotenv
 from services.report_parser import parse_daily_report, create_daily_progress_payload
 
 logger = logging.getLogger(__name__)
 
+load_dotenv('./.env')
+
+
+PLANE_BASE_URL = os.getenv("PLANE_API_URL", "https://af3142515b93.ngrok-free.app")
+WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "thang")
+PLANE_API_KEY = os.getenv("PLANE_API_KEY", "plane_api_fe15a1874a304088b027ce4bbe8afc23")
 
 class ReportHandler:
-    def __init__(self, base_url: str = "https://e6b5c063c2c1.ngrok-free.app", api_key: str = "plane_api_d958d52c6c0845cb94b8dadd7fef425e"):
-        self.base_url = base_url
-        self.api_key = api_key
+    def __init__(self):
+        self.base_url = PLANE_BASE_URL
+        self.api_key = PLANE_API_KEY
     
     async def save_daily_progress(
         self,
-        workspace_slug: str,
         project_id: str,
         issue_id: str,
         parsed_report: Dict,
@@ -26,7 +33,7 @@ class ReportHandler:
         try:
             payload = create_daily_progress_payload(parsed_report, notes)
             
-            url = f"{self.base_url}/api/workspaces/{workspace_slug}/projects/{project_id}/issues/{issue_id}/daily-progress/"
+            url = f"{self.base_url}/api/workspaces/{WORKSPACE_SLUG}/projects/{project_id}/issues/{issue_id}/daily-progress/"
             
             headers = {
                 "Content-Type": "application/json",
@@ -53,7 +60,6 @@ class ReportHandler:
         zalo_user_id: str,
         report_text: str,
         user_tasks: List[Dict],
-        workspace_slug: str = "thang"
     ) -> Dict:
         """
         Process staff's daily report and save to all their issues
@@ -99,7 +105,7 @@ class ReportHandler:
                     continue
                 
                 success = await self.save_daily_progress(
-                    workspace_slug=workspace_slug,
+                    workspace_slug=WORKSPACE_SLUG,
                     project_id=project_id,
                     issue_id=issue_id,
                     parsed_report=parsed_report,

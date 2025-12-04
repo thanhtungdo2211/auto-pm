@@ -187,7 +187,7 @@ async def process_webhook_async(request: dict, event_id: str):
             user_id = result.get("user_id")
             report_text = result.get("report_text")
             
-            logger.info(f"📝 Processing daily report from user {user_id}")
+            logger.info(f"Processing daily report from user {user_id}")
             
             # Get user's tasks for today
             all_users_tasks = await query_today_tasks()
@@ -202,7 +202,7 @@ async def process_webhook_async(request: dict, event_id: str):
             if not user_tasks:
                 await zalo_service.send_message(
                     user_id,
-                    "⚠️ Không tìm thấy task nào được gán cho bạn hôm nay."
+                    "Không tìm thấy task nào được gán cho bạn hôm nay."
                 )
                 return
             
@@ -219,7 +219,7 @@ async def process_webhook_async(request: dict, event_id: str):
                 process_result.get("message")
             )
             
-            logger.info(f"✅ Daily report processed. Saved: {process_result.get('saved_count', 0)}, Failed: {process_result.get('failed_count', 0)}")
+            logger.info(f"Daily report processed. Saved: {process_result.get('saved_count', 0)}, Failed: {process_result.get('failed_count', 0)}")
             return
 
         # Handle CV submission
@@ -244,7 +244,7 @@ async def process_webhook_async(request: dict, event_id: str):
             # Send to HR for approval
             await zalo_webhook_service.notify_hr(registration_id, cv_data)
             
-            logger.info(f"✅ CV submitted and pending HR approval: {registration_id}")
+            logger.info(f"CV submitted and pending HR approval: {registration_id}")
         
         # Handle HR approval
         elif result.get("action") == "hr_approved":
@@ -291,7 +291,7 @@ async def process_webhook_async(request: dict, event_id: str):
                     }
                 }
                 
-                logger.info(f"📤 Creating Plane user: {email}")
+                logger.info(f"Creating Plane user: {email}")
                 
                 user_response = requests.post(
                     f"{PLANE_API_URL}/api/users/",
@@ -302,7 +302,7 @@ async def process_webhook_async(request: dict, event_id: str):
                 
                 if user_response.status_code in [200, 201]:
                     user_data = user_response.json()
-                    logger.info(f"✅ Plane user created: {email}")
+                    logger.info(f"Plane user created: {email}")
                     
                     # Step 2: Add user to workspace
                     try:
@@ -311,7 +311,7 @@ async def process_webhook_async(request: dict, event_id: str):
                             "role": 15  # Member role
                         }
                         
-                        logger.info(f"📤 Adding user to workspace: {WORKSPACE_SLUG}")
+                        logger.info(f"Adding user to workspace: {WORKSPACE_SLUG}")
                         
                         member_response = requests.post(
                             f"{PLANE_API_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/",
@@ -324,14 +324,14 @@ async def process_webhook_async(request: dict, event_id: str):
                         )
                         
                         if member_response.status_code in [200, 201]:
-                            logger.info(f"✅ User added to workspace: {WORKSPACE_SLUG}")
+                            logger.info(f"User added to workspace: {WORKSPACE_SLUG}")
                         else:
                             error_msg = f"Failed to add member to workspace: {member_response.status_code} - {member_response.text}"
-                            logger.error(f"❌ {error_msg}")
+                            logger.error(f"{error_msg}")
                             # Continue anyway - user is created
                     
                     except requests.exceptions.RequestException as e:
-                        logger.error(f"❌ Error adding member to workspace: {str(e)}")
+                        logger.error(f"Error adding member to workspace: {str(e)}")
                         # Continue anyway - user is created
                     
                     # Remove pending registration
@@ -354,24 +354,24 @@ async def process_webhook_async(request: dict, event_id: str):
                     # Confirm to HR
                     await zalo_service.send_message(
                         zalo_webhook_service.hr_user_id,
-                        f"✅ Đã tạo tài khoản Plane cho {cv_data.get('name')}\n📧 Email: {email}\n📱 SĐT: {cv_data.get('phone')}\n🆔 User ID: {user_data.get('id')}"
+                        f"Đã tạo tài khoản Plane cho {cv_data.get('name')}\nEmail: {email}\nSĐT: {cv_data.get('phone')}\nUser ID: {user_data.get('id')}"
                     )
                     
-                    logger.info(f"✅ User approved and created: {user_data.get('id')}")
+                    logger.info(f"User approved and created: {user_data.get('id')}")
                 
                 else:
                     error_msg = f"Failed to create user: {user_response.status_code} - {user_response.text}"
-                    logger.error(f"❌ {error_msg}")
+                    logger.error(f"{error_msg}")
                     await zalo_service.send_message(
                         zalo_webhook_service.hr_user_id,
-                        f"❌ Lỗi tạo tài khoản Plane: {error_msg}"
+                        f"Lỗi tạo tài khoản Plane: {error_msg}"
                     )
                 
             except Exception as e:
-                logger.error(f"❌ User creation error: {str(e)}")
+                logger.error(f"User creation error: {str(e)}")
                 await zalo_service.send_message(
                     zalo_webhook_service.hr_user_id,
-                    f"❌ Lỗi tạo tài khoản: {str(e)}"
+                    f"Lỗi tạo tài khoản: {str(e)}"
                 )
         
         # Handle HR decline
@@ -384,7 +384,7 @@ async def process_webhook_async(request: dict, event_id: str):
             if not pending:
                 await zalo_service.send_message(
                     zalo_webhook_service.hr_user_id,
-                    f"❌ Registration ID không tồn tại: {registration_id}"
+                    f"Registration ID không tồn tại: {registration_id}"
                 )
                 return
             
@@ -403,16 +403,16 @@ async def process_webhook_async(request: dict, event_id: str):
             # Confirm to HR
             await zalo_service.send_message(
                 zalo_webhook_service.hr_user_id,
-                f"✅ Đã từ chối đơn của {cv_data.get('name')}"
+                f"Đã từ chối đơn của {cv_data.get('name')}"
             )
             
-            logger.info(f"✅ Registration declined: {registration_id}")
+            logger.info(f"Registration declined: {registration_id}")
         
         # Chatbot responses are already handled in handle_text_message
-        logger.info(f"✅ Webhook processed successfully: {event_id}")
+        logger.info(f"Webhook processed successfully: {event_id}")
     
     except Exception as e:
-        logger.error(f"❌ Error processing webhook async: {str(e)}", exc_info=True)
+        logger.error(f"Error processing webhook async: {str(e)}", exc_info=True)
 
 
 @router.post("/webhook")
@@ -430,7 +430,7 @@ async def zalo_webhook(request: dict, background_tasks: BackgroundTasks):
         
         # Check if already processed (duplicate prevention)
         if event_id in processed_events:
-            logger.info(f"⚠️ Duplicate event ignored: {event_id}")
+            logger.info(f"Duplicate event ignored: {event_id}")
             return {"status": "ok", "message": "Event already processed"}
         
         # Mark event as being processed immediately
@@ -439,7 +439,7 @@ async def zalo_webhook(request: dict, background_tasks: BackgroundTasks):
         # Log the event
         event_name = request.get('event_name', 'unknown')
         sender_id = request.get('sender', {}).get('id', 'unknown')
-        logger.info(f"📥 Webhook received: {event_name} from {sender_id} | Event ID: {event_id}")
+        logger.info(f"Webhook received: {event_name} from {sender_id} | Event ID: {event_id}")
         
         # Add background task for async processing
         background_tasks.add_task(process_webhook_async, request, event_id)
@@ -448,7 +448,7 @@ async def zalo_webhook(request: dict, background_tasks: BackgroundTasks):
         return {"status": "ok", "event_id": event_id}
     
     except Exception as e:
-        logger.error(f"❌ Error in webhook handler: {str(e)}", exc_info=True)
+        logger.error(f"Error in webhook handler: {str(e)}", exc_info=True)
         # Still return 200 to prevent retries
         return {"status": "error", "message": "Internal error, will not retry"}
 
@@ -464,7 +464,7 @@ async def get_conversation(zalo_user_id: str, count: int = 10, offset: int = 0):
             "conversation": conversation
         }
     except Exception as e:
-        logger.error(f"❌ Error retrieving conversation for user {zalo_user_id}: {str(e)}")
+        logger.error(f"Error retrieving conversation for user {zalo_user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -493,7 +493,7 @@ async def get_pending_registrations():
             ]
         }
     except Exception as e:
-        logger.error(f"❌ Error getting pending registrations: {str(e)}")
+        logger.error(f"Error getting pending registrations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -569,7 +569,7 @@ async def approve_registration(registration_id: str):
         }
         
     except Exception as e:
-        logger.error(f"❌ Error approving registration: {str(e)}")
+        logger.error(f"Error approving registration: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -600,5 +600,5 @@ async def decline_registration(registration_id: str):
         }
         
     except Exception as e:
-        logger.error(f"❌ Error declining registration: {str(e)}")
+        logger.error(f"Error declining registration: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -211,7 +211,7 @@ class ZaloWebhookService:
             
             current_hour = datetime.now().hour
             if self._is_daily_report_message(text, current_hour):
-                logger.info(f"📝 Daily report detected from user {user_id}")
+                logger.info(f"Daily report detected from user {user_id}")
                 return {
                     "status": "success",
                     "action": "daily_report_received",
@@ -311,10 +311,7 @@ class ZaloWebhookService:
             
             await self.zalo_service.send_message(
                 user_id,
-                "📸 Hệ thống hiện tại chưa hỗ trợ xử lý ảnh.\n\n" +
-                "Vui lòng gửi:\n" +
-                "- File PDF cho CV\n" +
-                "- File Excel/PDF cho WBS"
+                "Hệ thống hiện tại chưa hỗ trợ xử lý ảnh.\n\nVui lòng gửi:\n• File PDF cho CV\n• File Excel/PDF cho WBS"
             )
             
             return {
@@ -336,7 +333,7 @@ class ZaloWebhookService:
             
             # Determine user role
             user_role = self._get_user_role(user_id)
-            logger.info(f"📎 File received from {user_id} (role: {user_role})")
+            logger.info(f"File received from {user_id} (role: {user_role})")
             
             # Store that user sent an attachment
             self._recent_messages_with_attachments[user_id] = {
@@ -392,7 +389,7 @@ class ZaloWebhookService:
             if user_role not in ['hr', 'unknown']:
                 await self.zalo_service.send_message(
                     user_id,
-                    "❌ Bạn không thể gửi CV.\n\nChỉ ứng viên mới có thể gửi CV để đăng ký."
+                    "Bạn không thể gửi CV.\n\nChỉ ứng viên mới có thể gửi CV để đăng ký."
                 )
                 return {
                     "status": "error",
@@ -404,7 +401,7 @@ class ZaloWebhookService:
             if not file_name.lower().endswith('.pdf'):
                 await self.zalo_service.send_message(
                     user_id,
-                    f"⚠️ File '{file_name}' không phải là PDF.\n\n" +
+                    f"File '{file_name}' không phải là PDF.\n\n" +
                     "Vui lòng gửi CV dưới dạng file PDF."
                 )
                 return {
@@ -424,7 +421,7 @@ class ZaloWebhookService:
             # Extract CV information
             cv_data = await self.extract_cv_information(cv_path)
             
-            logger.info(f"✅ CV processed for user {user_id}")
+            logger.info(f"CV processed for user {user_id}")
             
             return {
                 "status": "success",
@@ -438,7 +435,7 @@ class ZaloWebhookService:
             logger.error(f"Error handling CV file: {str(e)}")
             await self.zalo_service.send_message(
                 user_id,
-                "❌ Lỗi xử lý CV. Vui lòng thử lại sau."
+                "Lỗi xử lý CV. Vui lòng thử lại sau."
             )
             raise
     
@@ -455,7 +452,7 @@ class ZaloWebhookService:
             if user_role != 'manager':
                 await self.zalo_service.send_message(
                     user_id,
-                    "❌ Bạn không có quyền gửi WBS.\n\n" +
+                    "Bạn không có quyền gửi WBS.\n\n" +
                     "Chỉ Manager mới có thể tạo WBS cho dự án."
                 )
                 return {
@@ -480,7 +477,7 @@ class ZaloWebhookService:
                 logger.error(f"Failed to read WBS file: {wbs_content}")
                 await self.zalo_service.send_message(
                     user_id,
-                    f"❌ Không thể đọc file WBS.\n\n{wbs_content}"
+                    f"Không thể đọc file WBS.\n\n{wbs_content}"
                 )
                 return {
                     "status": "error",
@@ -490,7 +487,7 @@ class ZaloWebhookService:
             
             # Send to chatbot with file content (query = None for file processing)
             if self.chatbot_service:
-                logger.info(f"📤 Sending WBS to chatbot for processing")
+                logger.info(f"Sending WBS to chatbot for processing")
              
                 chatbot_response = await self.chatbot_service.send_query_with_file(
                     user_id=user_id,
@@ -502,7 +499,7 @@ class ZaloWebhookService:
                 if chatbot_response:
                     await self.zalo_service.send_message(user_id, chatbot_response)
                     
-                    logger.info(f"✅ WBS processed for manager {user_id}")
+                    logger.info(f"WBS processed for manager {user_id}")
                     
                     return {
                         "status": "success",
@@ -514,7 +511,7 @@ class ZaloWebhookService:
                 else:
                     await self.zalo_service.send_message(
                         user_id,
-                        "❌ Không thể xử lý WBS lúc này.\n\nVui lòng thử lại sau."
+                        "Không thể xử lý WBS lúc này.\n\nVui lòng thử lại sau."
                     )
                     return {
                         "status": "error",
@@ -523,7 +520,7 @@ class ZaloWebhookService:
             else:
                 await self.zalo_service.send_message(
                     user_id,
-                    "❌ Hệ thống xử lý WBS chưa sẵn sàng."
+                    "Hệ thống xử lý WBS chưa sẵn sàng."
                 )
                 return {
                     "status": "error",
@@ -534,38 +531,38 @@ class ZaloWebhookService:
             logger.error(f"Error handling WBS file: {str(e)}")
             await self.zalo_service.send_message(
                 user_id,
-                "❌ Lỗi xử lý WBS. Vui lòng thử lại sau."
+                "Lỗi xử lý WBS. Vui lòng thử lại sau."
             )
             raise
     
     async def _send_file_type_error(self, user_id: str, file_name: str, user_role: str):
         """Send error message for unknown file type"""
         if user_role == 'hr' or user_role == 'unknown':
-            message = f"""❌ File '{file_name}' không được hỗ trợ.
+            message = f"""File '{file_name}' không được hỗ trợ.
 
-📄 **Để đăng ký làm nhân viên:**
-- Tên file phải chứa: CV, Resume, Curriculum
-- Định dạng: PDF
-- Ví dụ: CV_NguyenVanA.pdf, Resume.pdf
+Để đăng ký làm nhân viên:
+• Tên file phải chứa: CV, Resume, Curriculum
+• Định dạng: PDF
+• Ví dụ: CV_NguyenVanA.pdf, Resume.pdf
 
 Hoặc gõ "Đăng ký" để được hướng dẫn."""
         
         elif user_role == 'manager':
-            message = f"""❌ File '{file_name}' không được hỗ trợ.
+            message = f"""File '{file_name}' không được hỗ trợ.
 
-📊 **Để tạo WBS cho dự án:**
-- Tên file phải chứa: WBS, Work-Breakdown, Project-Plan
-- Định dạng: Excel (.xlsx), PDF, CSV
-- Ví dụ: WBS_Project.xlsx, Work-Breakdown-Structure.pdf
+Để tạo WBS cho dự án:
+• Tên file phải chứa: WBS, Work-Breakdown, Project-Plan
+• Định dạng: Excel (.xlsx), PDF, CSV
+• Ví dụ: WBS_Project.xlsx, Work-Breakdown-Structure.pdf
 
 File WBS sẽ được phân tích tự động để tạo tasks."""
         
         else:
-            message = f"""❌ File '{file_name}' không được hỗ trợ.
+            message = f"""File '{file_name}' không được hỗ trợ.
 
-**Loại file được phép:**
-- 📄 CV (PDF) - Dành cho ứng viên
-- 📊 WBS (Excel/PDF) - Dành cho Manager"""
+Loại file được phép:
+• CV (PDF) - Dành cho ứng viên
+• WBS (Excel/PDF) - Dành cho Manager"""
         
         await self.zalo_service.send_message(user_id, message)
     
@@ -590,7 +587,7 @@ File WBS sẽ được phân tích tự động để tạo tasks."""
             with open(file_path, "wb") as f:
                 f.write(file_content)
             
-            logger.info(f"✅ File saved: {file_path}")
+            logger.info(f"File saved: {file_path}")
             return file_path
         
         except Exception as e:
@@ -781,16 +778,16 @@ File WBS sẽ được phân tích tự động để tạo tasks."""
     
     async def send_registration_instructions(self, user_id: str) -> bool:
         """Send registration instructions"""
-        message = """Chào bạn! 👋
+        message = """Chào bạn!
 
 Để đăng ký làm nhân viên, vui lòng gửi CV của bạn dưới dạng file PDF.
 
-📄 Yêu cầu CV bao gồm:
-- ✅ File định dạng PDF
-- ✅ Họ tên đầy đủ
-- ✅ Email liên hệ
-- ✅ Số điện thoại
-- ✅ Kỹ năng và kinh nghiệm
+Yêu cầu CV bao gồm:
+• File định dạng PDF
+• Họ tên đầy đủ
+• Email liên hệ
+• Số điện thoại
+• Kỹ năng và kinh nghiệm
 
 Hệ thống sẽ tự động xử lý và thông báo kết quả cho bạn."""
         
@@ -798,7 +795,7 @@ Hệ thống sẽ tự động xử lý và thông báo kết quả cho bạn.""
     
     async def send_welcome_message(self, user_id: str) -> bool:
         """Send welcome message"""
-        message = """Chào mừng bạn đến với Auto Project Manager! 🎉
+        message = """Chào mừng bạn đến với Auto Project Manager!
 
 Để đăng ký làm nhân viên, hãy gửi tin nhắn: "Đăng ký"
 
@@ -808,14 +805,14 @@ Chúng tôi sẽ hướng dẫn bạn các bước tiếp theo."""
     
     async def send_pending_notification(self, user_id: str, name: str) -> bool:
         """Notify candidate that CV is pending review"""
-        message = f"""📄 CV ĐÃ ĐƯỢC GỬI THÀNH CÔNG!
+        message = f"""CV ĐÃ ĐƯỢC GỬI THÀNH CÔNG!
 
 Xin chào {name},
 
 CV của bạn đã được hệ thống tiếp nhận và đang chờ HR xem xét.
 
-⏳ Trạng thái: Đang chờ duyệt
-📧 Chúng tôi sẽ thông báo kết quả cho bạn sớm nhất.
+Trạng thái: Đang chờ duyệt
+Chúng tôi sẽ thông báo kết quả cho bạn sớm nhất.
 
 Cảm ơn bạn đã quan tâm!"""
         
@@ -830,46 +827,46 @@ Cảm ơn bạn đã quan tâm!"""
         projects = user_data.get('projects', [])
         if projects:
             for i, project in enumerate(projects[:3], 1):
-                projects_text += f"\n  {i}. {project.get('name', 'N/A')} - {project.get('role', 'N/A')}"
+                projects_text += f"\n  • {project.get('name', 'N/A')} - {project.get('role', 'N/A')}"
         else:
             projects_text = "\n  Không có dự án"
         
         strengths = user_data.get('strengths', [])
         strengths_text = ', '.join(strengths) if strengths else 'N/A'
         
-        message = f"""🆕 ĐƠN ĐĂNG KÝ MỚI CẦN DUYỆT
+        message = f"""ĐƠN ĐĂNG KÝ MỚI CẦN DUYỆT
 
-👤 Họ tên: {user_data.get('name', 'N/A')}
-📧 Email: {user_data.get('email', 'N/A')}
-📱 Số điện thoại: {phone}
-💼 Vị trí: {user_data.get('role', 'N/A')}
-⭐ Cấp độ: {user_data.get('experience_level', 'N/A')}
-📅 Kinh nghiệm: {user_data.get('experience_years', 'N/A')} năm
-💡 Điểm mạnh: {strengths_text}
-💪 Kỹ năng: {skills_text}
-📂 Dự án:{projects_text}
+Họ tên: {user_data.get('name', 'N/A')}
+Email: {user_data.get('email', 'N/A')}
+Số điện thoại: {phone}
+Vị trí: {user_data.get('role', 'N/A')}
+Cấp độ: {user_data.get('experience_level', 'N/A')}
+Kinh nghiệm: {user_data.get('experience_years', 'N/A')} năm
+Điểm mạnh: {strengths_text}
+Kỹ năng: {skills_text}
+Dự án:{projects_text}
 
-🆔 Registration ID: {registration_id}
+Registration ID: {registration_id}
 
 Vui lòng xem xét và phản hồi:
-✅ Gõ: APPROVE {registration_id} để chấp nhận
-❌ Gõ: DECLINE {registration_id} để từ chối"""
+• Gõ: APPROVE {registration_id} để chấp nhận
+• Gõ: DECLINE {registration_id} để từ chối"""
         
         return await self.zalo_service.send_message(self.hr_user_id, message)
     
     async def send_approval_notification(self, user_id: str, user_data: Dict[str, Any]) -> bool:
         """Send approval notification to candidate"""
-        phone_text = f"\n📱 SĐT: {user_data.get('phone')}" if user_data.get('phone') else ""
+        phone_text = f"\nSĐT: {user_data.get('phone')}" if user_data.get('phone') else ""
         
-        message = f"""✅ ĐƠN ĐĂNG KÝ ĐÃ ĐƯỢC DUYỆT!
+        message = f"""ĐƠN ĐĂNG KÝ ĐÃ ĐƯỢC DUYỆT!
 
 Chúc mừng {user_data.get('name')}!
 Đơn đăng ký của bạn đã được HR phê duyệt.
 
-📋 Thông tin tài khoản:
-👤 Tên: {user_data.get('name')}
-📧 Email: {user_data.get('email')}{phone_text}
-🆔 ID: {user_data.get('id')}
+Thông tin tài khoản:
+Tên: {user_data.get('name')}
+Email: {user_data.get('email')}{phone_text}
+ID: {user_data.get('id')}
 
 HR sẽ liên hệ với bạn trong thời gian sớm nhất.
 Cảm ơn bạn đã đăng ký!"""
@@ -878,7 +875,7 @@ Cảm ơn bạn đã đăng ký!"""
     
     async def send_rejection_notification(self, user_id: str, name: str) -> bool:
         """Send rejection notification"""
-        message = f"""❌ THÔNG BÁO TỪ HR
+        message = f"""THÔNG BÁO TỪ HR
 
 Xin chào {name},
 

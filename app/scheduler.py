@@ -24,10 +24,10 @@ def format_task_message(user_data: dict) -> str:
     tasks = user_data.get('tasks', [])
     
     if task_count == 0:
-        return f"Chào {display_name}! 👋\nBạn không có task nào hôm nay."
+        return f"Chào {display_name}!\nBạn không có task nào hôm nay."
     
     # Build message
-    message = f"🔔 Chào {display_name}!\n"
+    message = f"Chào {display_name}!\n"
     message += f"Bạn có {task_count} task hôm nay:\n"
     message += "─" * 30 + "\n\n"
     
@@ -38,20 +38,21 @@ def format_task_message(user_data: dict) -> str:
         priority = issue.get('priority', 'none')
         target_date = issue.get('target_date', 'N/A')
         
-        priority_emoji = {
-            'urgent': '🔴',
-            'high': '🟠',
-            'medium': '🟡',
-            'low': '🟢',
-            'none': '⚪'
-        }.get(priority, '⚪')
+        priority_text = {
+            'urgent': 'URGENT',
+            'high': 'HIGH',
+            'medium': 'MEDIUM',
+            'low': 'LOW',
+            'none': 'NONE'
+        }.get(priority, 'NONE')
         
-        message += f"{idx}. {priority_emoji} {task_name}\n"
-        message += f"   📁 Project: {project_name}\n"
-        message += f"   📅 Due: {target_date}\n\n"
+        message += f"• {task_name}\n"
+        message += f"  Priority: {priority_text}\n"
+        message += f"  Project: {project_name}\n"
+        message += f"  Due: {target_date}\n\n"
     
     message += "─" * 30 + "\n"
-    message += "💪 Chúc bạn làm việc hiệu quả!"
+    message += "Chúc bạn làm việc hiệu quả!"
     
     return message
 
@@ -95,10 +96,10 @@ async def send_daily_task_notifications():
                 )
                 
                 if sent:
-                    logger.info(f"✅ Notification sent to {user.get('display_name')} ({user.get('email')})")
+                    logger.info(f"Notification sent to {user.get('display_name')} ({user.get('email')})")
                     success_count += 1
                 else:
-                    logger.error(f"❌ Failed to send notification to {user.get('display_name')}")
+                    logger.error(f"Failed to send notification to {user.get('display_name')}")
                     failed_count += 1
                     
                 # Add small delay to avoid rate limiting
@@ -140,14 +141,14 @@ async def send_daily_report_request():
                 display_name = user.get('display_name', 'User')
                 task_count = user.get('task_count', 0)
                 
-                message = f"📝 Chào {display_name}!\n\n"
+                message = f"Chào {display_name}!\n\n"
                 message += f"Đã đến 6 giờ chiều, vui lòng gửi báo cáo công việc hôm nay.\n"
                 message += f"Bạn có {task_count} task cần báo cáo.\n\n"
                 message += "Hãy gửi báo cáo theo định dạng:\n"
-                message += "- Task đã làm\n"
-                message += "- Tiến độ (%)\n"
-                message += "- Thời gian đã dùng\n"
-                message += "- Ghi chú (nếu có)\n\n"
+                message += "• Task đã làm\n"
+                message += "• Tiến độ (%)\n"
+                message += "• Thời gian đã dùng\n"
+                message += "• Ghi chú (nếu có)\n\n"
                 message += "Ví dụ: Task A: 60%, 3 giờ. Task B: 100%, 4 giờ."
                 
                 sent = await zalo_service.send_message(
@@ -161,10 +162,10 @@ async def send_daily_report_request():
                 )
                 
                 if sent:
-                    logger.info(f"✅ Report request sent to {display_name}")
+                    logger.info(f"Report request sent to {display_name}")
                     success_count += 1
                 else:
-                    logger.error(f"❌ Failed to send request to {display_name}")
+                    logger.error(f"Failed to send request to {display_name}")
                     failed_count += 1
                 
                 await asyncio.sleep(0.5)
