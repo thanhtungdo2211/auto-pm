@@ -17,6 +17,14 @@ from zoneinfo import ZoneInfo
 scheduler = AsyncIOScheduler()
 zalo_service = ZaloService()
 
+def format_report_message(user_data: dict) -> str:
+    
+    pass
+async def send_daily_report_request():
+    """Sent daily report to Manager"""
+    
+    pass 
+
 def format_task_message(user_data: dict) -> str:
     """Format user tasks into a readable message"""
     display_name = user_data.get('display_name', 'User')
@@ -189,7 +197,7 @@ def start_scheduler():
     # Daily task notifications at 8:00 AM
     scheduler.add_job(
         send_daily_task_notifications,
-        trigger=CronTrigger(hour=8, minute=0, timezone=asia_tz),
+        trigger=CronTrigger(hour=10, minute=29, timezone=asia_tz),
         id="daily_task_notifications",
         name="Send daily task notifications at 08:00 Asia/Ho_Chi_Minh (GMT+7)",
         replace_existing=True
@@ -198,7 +206,7 @@ def start_scheduler():
     # Daily report request at 6:00 PM
     scheduler.add_job(
         send_daily_report_request,
-        trigger=CronTrigger(hour=18, minute=0, timezone=asia_tz),
+        trigger=CronTrigger(hour=10, minute=30, timezone=asia_tz),
         id="daily_report_request",
         name="Send daily report request at 18:00 Asia/Ho_Chi_Minh (GMT+7)",
         replace_existing=True

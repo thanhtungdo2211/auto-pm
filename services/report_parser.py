@@ -1,6 +1,7 @@
 import re
 from typing import Dict, List, Optional
 from datetime import datetime
+import json
 
 def parse_daily_report(report_text: str) -> Optional[Dict]:
     """
@@ -106,3 +107,16 @@ def create_daily_progress_payload(parsed_report: Dict, notes: str) -> Dict:
     }
     
     return payload
+
+if __name__ == "__main__":
+    report_text = "báo cáo công việc ngày hôm nay : Vì hôm nay tôi làm rất năng suất nên tôi đã hoàn thành task Test module nhận diện khuôn mặt với nhiệm vụ là training mô hình"
+    json_dr = parse_daily_report(report_text)
+    if json_dr is None:
+        print("No parsed report")
+    else:
+        print("Parsed report:")
+        print(json.dumps(json_dr, ensure_ascii=False, indent=2))
+
+        payload = create_daily_progress_payload(json_dr, report_text)
+        print("\nPayload:")
+        print(json.dumps(payload, ensure_ascii=False, indent=2))

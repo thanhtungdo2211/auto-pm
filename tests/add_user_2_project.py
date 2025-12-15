@@ -2,13 +2,13 @@ import requests
 import json
 
 # API endpoint configuration
-workspace_slug = "workspace-mq"
-project_id = "efe7ec80-2fea-40b7-945e-23310ae7c00f"
-url = f"http://localhost:8000/api/workspaces/{workspace_slug}/projects/{project_id}/add-member/"
+workspace_slug = "thang"
+project_id = "741c0b5a-6d3c-4afb-af41-9ff320443db7"
+url = f"https://975a90a00e3d.ngrok-free.app/api/workspaces/{workspace_slug}/projects/{project_id}/add-member/"
 
 # Member data
 data = {
-    "email": "newuser2@example.com",
+    "email": "tungdt.8383@gmail.com",
     "role": 15
 }
 

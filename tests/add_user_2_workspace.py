@@ -3,15 +3,15 @@ import json
 import os
 
 # API endpoint
-PLANE_BASE_URL = os.getenv("PLANE_API_URL", "https://af3142515b93.ngrok-free.app")
+PLANE_BASE_URL = os.getenv("PLANE_API_URL", "975a90a00e3d.ngrok-free.app")
 WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "thang")
 
 url = f"https://{PLANE_BASE_URL}/api/workspaces/{WORKSPACE_SLUG}/add-member/"
 
 # Member data
 data = {
-    "email": "newuser2@example.com",
-    "role": 20
+    "email": "tungdt.8383@gmail.com",
+    "role": 15
 }
 
 # Headers with API key

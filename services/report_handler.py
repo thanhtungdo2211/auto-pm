@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 load_dotenv('./.env')
 
-
 PLANE_BASE_URL = os.getenv("PLANE_API_URL", "https://af3142515b93.ngrok-free.app")
 WORKSPACE_SLUG = os.getenv("WORKSPACE_SLUG", "thang")
 PLANE_API_KEY = os.getenv("PLANE_API_KEY", "plane_api_fe15a1874a304088b027ce4bbe8afc23")
@@ -44,10 +43,10 @@ class ReportHandler:
                 response = await client.post(url, json=payload, headers=headers, timeout=30.0)
                 
                 if response.status_code in [200, 201]:
-                    logger.info(f"✅ Daily progress saved for issue {issue_id}")
+                    logger.info(f"Daily progress saved for issue {issue_id}")
                     return True
                 else:
-                    logger.error(f"❌ Failed to save progress. Status: {response.status_code}")
+                    logger.error(f"Failed to save progress. Status: {response.status_code}")
                     logger.error(f"Response: {response.text}")
                     return False
                     
@@ -81,7 +80,7 @@ class ReportHandler:
                 return {
                     "success": False,
                     "error": "Cannot parse report",
-                    "message": "❌ Không thể đọc được báo cáo của bạn.\n\nVui lòng gửi lại theo định dạng:\nBáo cáo công việc ngày hôm nay:\nTask A: 60%, 3 tiếng. Task B: 100%, 4 tiếng."
+                    "message": "Không thể đọc được báo cáo của bạn.\n\nVui lòng gửi lại theo định dạng:\nBáo cáo công việc ngày hôm nay:\nTask A: 60%, 3 tiếng. Task B: 100%, 4 tiếng."
                 }
             
             if not user_tasks:
@@ -89,7 +88,7 @@ class ReportHandler:
                 return {
                     "success": False,
                     "error": "No tasks found",
-                    "message": "⚠️ Không tìm thấy task nào được gán cho bạn hôm nay."
+                    "message": "Không tìm thấy task nào được gán cho bạn hôm nay."
                 }
             
             # Save progress for each task/issue
@@ -105,7 +104,6 @@ class ReportHandler:
                     continue
                 
                 success = await self.save_daily_progress(
-                    workspace_slug=WORKSPACE_SLUG,
                     project_id=project_id,
                     issue_id=issue_id,
                     parsed_report=parsed_report,
@@ -124,13 +122,13 @@ class ReportHandler:
                     for task in parsed_report['tasks']
                 ])
                 
-                confirmation_msg = f"✅ Cảm ơn bạn đã gửi báo cáo!\n\n"
+                confirmation_msg = f"Cảm ơn bạn đã gửi báo cáo!\n\n"
                 confirmation_msg += f"Báo cáo đã được ghi nhận cho {saved_count} task:\n\n"
                 confirmation_msg += task_summary + "\n\n"
-                confirmation_msg += "📊 Báo cáo sẽ được tổng hợp và gửi cho quản lý vào 8h sáng mai."
+                confirmation_msg += "Báo cáo sẽ được tổng hợp và gửi cho quản lý vào 8h sáng mai."
                 
                 if failed_issues:
-                    confirmation_msg += f"\n\n⚠️ Không thể lưu báo cáo cho: {', '.join(failed_issues)}"
+                    confirmation_msg += f"\n\nKhông thể lưu báo cáo cho: {', '.join(failed_issues)}"
                 
                 return {
                     "success": True,
@@ -142,7 +140,7 @@ class ReportHandler:
                 return {
                     "success": False,
                     "error": "Failed to save reports",
-                    "message": "❌ Có lỗi khi lưu báo cáo. Vui lòng thử lại sau."
+                    "message": "Có lỗi khi lưu báo cáo. Vui lòng thử lại sau."
                 }
                 
         except Exception as e:
@@ -150,5 +148,5 @@ class ReportHandler:
             return {
                 "success": False,
                 "error": str(e),
-                "message": "❌ Có lỗi xảy ra khi xử lý báo cáo. Vui lòng thử lại sau."
+                "message": "Có lỗi xảy ra khi xử lý báo cáo. Vui lòng thử lại sau."
             }

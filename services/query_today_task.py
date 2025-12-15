@@ -216,6 +216,42 @@ def format_user_tasks_for_notification(user_task_map: Dict[str, Dict]) -> List[D
         notification_data.append(notification_entry)
     
     return notification_data
+from datetime import date, timedelta
+
+async def get_project_issues_yesterday(project_id: str) -> List[Dict]:
+    """
+    Fetch issues for a project that were in progress yesterday
+    (start_date <= yesterday <= target_date)
+    """
+    try:
+        yesterday_str = (date.today() - timedelta(days=1)).isoformat()
+
+        url = f"{PLANE_BASE_URL}/api/v1/workspaces/{WORKSPACE_SLUG}/projects/{project_id}/issues/"
+        headers = {"x-api-key": PLANE_API_KEY}
+        
+        async with httpx.AsyncClient(verify=False) as client:
+            response = await client.get(url, headers=headers, timeout=30.0)
+            response.raise_for_status()
+            data = response.json()
+        
+        all_issues = data.get("results", [])
+        yesterday_issues = []
+
+        for issue in all_issues:
+            start_date = issue.get("start_date")
+            target_date = issue.get("target_date")
+
+            if not start_date or not target_date:
+                continue
+
+            if start_date <= yesterday_str <= target_date:
+                yesterday_issues.append(issue)
+
+        return yesterday_issues
+
+    except Exception as e:
+        print(f"Error fetching yesterday issues for project {project_id}: {e}")
+        return []
 
 def save_results(data: Dict, filename: str = "data/daily_tasks.json"):
     """
