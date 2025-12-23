@@ -1,8 +1,10 @@
 import os
 import logging
+import json
 from typing import Dict, Any, Optional
 import httpx
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -18,6 +20,29 @@ class ChatbotAgentService:
         self.chatbot_url = os.getenv("CHATBOT_MANAGER_URL", "")
         if not self.chatbot_url:
             logger.warning("CHATBOT_MANAGER_URL not configured")
+        self.chatbot_log_file = os.getenv("CHATBOT_LOG_FILE", "data/chatbot_requests.log")
+        # Ensure log directory exists
+        try:
+            os.makedirs(os.path.dirname(self.chatbot_log_file), exist_ok=True)
+        except Exception:
+            # If dirname is empty (current dir), skip
+            pass
+        # Lưu mode_report theo user_id để sử dụng lại lần query tiếp theo
+        self.user_mode_report = {}  # {user_id: mode_report}
+
+    def _log_chat_request(self, payload: Dict[str, Any]):
+        """
+        Append outbound chatbot payload to a log file for debugging/testing.
+        """
+        try:
+            record = {
+                "ts": datetime.now().isoformat(),
+                "payload": payload,
+            }
+            with open(self.chatbot_log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.error("Failed to log chatbot payload: %s", exc)
     
     async def send_query(self, user_id: str, query: str) -> Optional[str]:
         """
@@ -208,3 +233,85 @@ class ChatbotAgentService:
             "success": response_text is not None,
             "context": context
         }
+
+    async def send_chat_request(
+        self,
+        user_id: str,
+        role: Optional[str],
+        query: str,
+        mode_report: Optional[bool] = None,
+        file_content: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Gửi yêu cầu đến chatbot với đầy đủ tham số (role, mode_report, file_content).
+        Dùng cho các tác vụ hẹn giờ (nhắc báo cáo staff, tổng hợp báo cáo cho manager).
+        
+        Nếu mode_report không được truyền vào (None), sẽ lấy từ lần response trước đó.
+        Nếu chưa có lưu, mặc định là False.
+        """
+        if not self.chatbot_url:
+            logger.error("Chatbot URL not configured")
+            return None
+
+        # Nếu mode_report không được truyền vào, lấy từ lần response trước đó
+        if mode_report is None:
+            mode_report = self.user_mode_report.get(user_id, False)
+            logger.info(
+                "Using saved mode_report=%s for user %s (from previous response)",
+                mode_report,
+                user_id,
+            )
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                payload = {
+                    "user_id": int(user_id) if str(user_id).isdigit() else hash(user_id) % (10 ** 10),
+                    "role": role or "",
+                    "query": query or "",
+                    "file_content": file_content or "",
+                    "mode_report": mode_report,
+                }
+
+                # Log outbound payload for testing/debug
+                self._log_chat_request(payload)
+
+                logger.info(
+                    "Sending chat request (mode_report=%s) to chatbot for user %s, role=%s",
+                    mode_report,
+                    user_id,
+                    role,
+                )
+
+                response = await client.post(self.chatbot_url, json=payload)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    response_mode_report = data.get("mode_report", mode_report)
+                    
+                    # Lưu mode_report từ response để dùng cho lần query tiếp theo
+                    self.user_mode_report[user_id] = response_mode_report
+                    logger.info(
+                        "Saved mode_report=%s for user %s (from current response)",
+                        response_mode_report,
+                        user_id,
+                    )
+                    
+                    return {
+                        "response": data.get("response"),
+                        "mode_report": response_mode_report,
+                        "raw": data,
+                    }
+
+                logger.error(
+                    "Chatbot API error: %s - %s",
+                    response.status_code,
+                    response.text,
+                )
+                return None
+
+        except httpx.TimeoutException:
+            logger.error("Chatbot API timeout for user %s (mode_report=%s)", user_id, mode_report)
+            return None
+        except Exception as exc:
+            logger.error("Error calling chatbot API: %s", exc, exc_info=True)
+            return None

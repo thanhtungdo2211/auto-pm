@@ -49,37 +49,32 @@ class ZaloWebhookService:
     
     def _get_user_role(self, zalo_user_id: str) -> str:
         """
-        Determine user role based on Zalo ID using Plane API
-        
-        Returns:
-            str: 'hr', 'manager', 'staff', or 'unknown'
+        Determine user role based on Zalo ID using Plane API.
+        Chỉ trả về 'manager' hoặc 'staff' (mặc định staff nếu không rõ/khác).
         """
-        # Check if HR
-        if zalo_user_id == self.hr_user_id:
-            return 'hr'
-        
-        # Check via Plane API
         try:
-            response = requests.get(
+            resp = requests.get(
                 f"{self.plane_api_url}/api/zalo-users/{zalo_user_id}/",
                 headers={"Content-Type": "application/json"},
-                timeout=5
+                timeout=5,
             )
-            
-            if response.status_code == 200:
-                user_data = response.json()
-                zalo_metadata = user_data.get("zalo_metadata", {})
-                return zalo_metadata.get("role", "staff")
-            elif response.status_code == 404:
-                logger.info(f"User not found in Plane: {zalo_user_id}")
-                return 'unknown'
+            if resp.status_code == 200:
+                user_data = resp.json()
+                role = (user_data.get("zalo_metadata") or {}).get("role") or ""
+                role_lower = role.lower()
+                if role_lower == "manager":
+                    return "manager"
+                return "staff"
             else:
-                logger.warning(f"Plane API error: {response.status_code}")
-                return 'unknown'
-                
-        except Exception as e:
-            logger.error(f"Error fetching user role from Plane API: {str(e)}")
-            return 'unknown'
+                # 404 hoặc lỗi khác -> staff mặc định
+                if resp.status_code == 404:
+                    logger.info("User not found in Plane: %s", zalo_user_id)
+                else:
+                    logger.warning("Plane API error: %s", resp.status_code)
+                return "staff"
+        except Exception as exc:
+            logger.error("Error fetching user role from Plane API: %s", exc)
+            return "staff"
     
     def _detect_file_type(self, file_name: str, user_role: str) -> str:
         """
@@ -232,34 +227,36 @@ class ZaloWebhookService:
             if self.chatbot_service:
                 logger.info(f"Sending message to chatbot for user {user_id}")
 
-                ###
-                result = self.qdrantdb.search_one(user_id, self.embed.embed_query(text))
-                logging.info(result)
-                logging.info(self.qdrantdb.list_points(user_id))
-                chatbot_response = await self.chatbot_service.send_long_memory(user_id=user_id, 
-                                                            query=text,
-                                                            long_memory=str(result))
-                ###
+                # Lấy role từ Plane (manager/staff, mặc định staff)
+                user_role = self._get_user_role(user_id)
 
-                # chatbot_response = await self.chatbot_service.send_query(user_id, text)
-                
+                # Gửi toàn bộ query tới chatbot qua send_chat_request (không dùng long_memory)
+                chat_res = await self.chatbot_service.send_chat_request(
+                    user_id=str(user_id),
+                    role=user_role,
+                    query=text,
+                    mode_report=False,
+                    file_content="",
+                )
+                chatbot_response = (chat_res or {}).get("response")
+
                 if chatbot_response:
                     await self.zalo_service.send_message(user_id, chatbot_response)
                     self.qdrantdb.upsert_one(
-                        user_id = user_id, 
-                        vector = self.embed.embed_query(text),
-                        payload = {
+                        user_id=user_id,
+                        vector=self.embed.embed_query(text),
+                        payload={
                             "role": "user",
                             "text": text
-                        } 
+                        }
                     )
                     self.qdrantdb.upsert_one(
-                        user_id = user_id, 
-                        vector = self.embed.embed_query(chatbot_response),
-                        payload = {
+                        user_id=user_id,
+                        vector=self.embed.embed_query(chatbot_response),
+                        payload={
                             "role": "chatbot",
                             "text": chatbot_response
-                        } 
+                        }
                     )
                     return {
                         "status": "success",
@@ -268,15 +265,14 @@ class ZaloWebhookService:
                         "query": text,
                         "response": chatbot_response
                     }
-                    
                 else:
                     self.qdrantdb.upsert_one(
-                        user_id = user_id, 
-                        vector = self.embed.embed_query(text),
-                        payload = {
+                        user_id=user_id,
+                        vector=self.embed.embed_query(text),
+                        payload={
                             "role": "user",
                             "text": text
-                        } 
+                        }
                     )
                     result = self.qdrantdb.search_one(user_id, self.embed.embed_query(text))
                     logging.info(result)
